@@ -24,7 +24,8 @@ cmake_minimum_required(VERSION 3.6)
 
 # Allow switching of radios
 set(RADIO_LIST sx1272 sx1276 sx126x)
-set(RADIO sx1272 CACHE STRING "Default radio is sx1272")
+# set(RADIO sx1272 CACHE STRING "Default radio is sx1272")
+set(RADIO sx126x CACHE STRING "Default radio is sx126x")
 set_property(CACHE RADIO PROPERTY STRINGS ${RADIO_LIST})
 set_property(CACHE RADIO PROPERTY ADVANCED)
 

@@ -220,7 +220,7 @@ typedef struct LoRaMacHandlerAppData_s
 LoRaMacHandlerAppData_t AppData =
 {
     .MsgType = LORAMAC_HANDLER_UNCONFIRMED_MSG,
-    .Buffer = NULL,
+    .Buffer = NULL,                            
     .BufferSize = 0,
     .Port = 0
 };

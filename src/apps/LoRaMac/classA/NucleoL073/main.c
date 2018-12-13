@@ -31,23 +31,40 @@
 #include "Commissioning.h"
 #include "NvmCtxMgmt.h"
 
+
+///// Include header file for sensors readings
+//#include "sensors.h"
+//uint8_t GetTemperatureLevel
+
+// #include <SHT21.h>  // include SHT21 library
+
+// SHT21 sht; 
+
+// float temp; 	// variable to store temperature
+// float humidity; // variable to store hemidity
+/////
+
+
 #ifndef ACTIVE_REGION
 
 #warning "No active region defined, LORAMAC_REGION_EU868 will be used as default."
 
-#define ACTIVE_REGION LORAMAC_REGION_EU868
+///// #define ACTIVE_REGION LORAMAC_REGION_EU868
+#define ACTIVE_REGION LORAMAC_REGION_US915
 
 #endif
 
 /*!
  * Defines the application data transmission duty cycle. 5s, value in [ms].
  */
+///// Changed for longer transaction (30s)
 #define APP_TX_DUTYCYCLE                            5000
 
 /*!
  * Defines a random delay for application data transmission duty cycle. 1s,
  * value in [ms].
  */
+///// Changed added TX delay time (10s)
 #define APP_TX_DUTYCYCLE_RND                        1000
 
 /*!
@@ -65,7 +82,11 @@
  *
  * \remark Please note that when ADR is enabled the end-device should be static
  */
-#define LORAWAN_ADR_ON                              1
+///// Set ADR to OFF (Default ON)
+#define LORAWAN_ADR_ON                              0
+
+
+
 
 #if defined( REGION_EU868 )
 
@@ -79,6 +100,8 @@
 #define LORAWAN_DUTYCYCLE_ON                        true
 
 #endif
+
+
 
 /*!
  * LoRaWAN application port
@@ -108,6 +131,10 @@ static uint32_t DevAddr = LORAWAN_DEVICE_ADDRESS;
  * Application port
  */
 static uint8_t AppPort = LORAWAN_APP_PORT;
+
+
+
+///// Payload data and size (?)
 
 /*!
  * User application data size
@@ -206,6 +233,9 @@ typedef enum
     LORAMAC_HANDLER_CONFIRMED_MSG = !LORAMAC_HANDLER_UNCONFIRMED_MSG
 }LoRaMacHandlerMsgTypes_t;
 
+
+uint8_t Message1[] = "Hello LoRa!";                 /////*****
+
 /*!
  * Application data structure
  */
@@ -220,8 +250,8 @@ typedef struct LoRaMacHandlerAppData_s
 LoRaMacHandlerAppData_t AppData =
 {
     .MsgType = LORAMAC_HANDLER_UNCONFIRMED_MSG,
-    .Buffer = NULL,
-    .BufferSize = 0,
+    .Buffer = NULL,                                  /////***** Default: 'NULL'
+    .BufferSize = 0,                                 /////***** Default: '0'
     .Port = 0
 };
 
@@ -350,8 +380,15 @@ static void PrepareTxFrame( uint8_t port )
     {
     case 2:
         {
-            AppDataSizeBackup = AppDataSize = 1;
-            AppDataBuffer[0] = AppLedStateOn;
+            // AppDataSizeBackup = AppDataSize = 1;
+            // AppDataBuffer[0] = AppLedStateOn;
+            AppDataSize = 6;
+            AppDataBuffer[0] = (uint8_t)84;
+            AppDataBuffer[1] = (uint8_t)101;
+            AppDataBuffer[2] = (uint8_t)109;
+            AppDataBuffer[3] = (uint8_t)112;
+            AppDataBuffer[4] = (uint8_t)58;
+            AppDataBuffer[5] = (uint8_t)32;
         }
         break;
     case 224:
