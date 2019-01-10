@@ -22,6 +22,7 @@
  */
 #include "stm32l0xx.h"
 #include "utilities.h"
+#include "delay.h"      /////*****
 #include "gpio.h"
 #include "adc.h"
 #include "spi.h"
@@ -58,6 +59,8 @@ Gpio_t Led2;
  * MCU objects
  */
 Uart_t Uart2;
+// I2c_t I2c1;             /////***** Added I2C MCU Object (I2c1) (see board.c \NAMote72)
+I2c_t I2c2;             /////***** Added I2C MCU Object (I2c2) (see board.c \NAMote72)
 
 /*!
  * Initializes the unused GPIO to a know status
@@ -130,7 +133,8 @@ void BoardCriticalSectionEnd( uint32_t *mask )
 
 void BoardInitPeriph( void )
 {
-
+    /////***** Can initialize peripherals here
+    //GpioInit ( &test, TEST, PIN_INPUT, PIN_PUSH_PULL, PIN_NO_PULL, 0);
 }
 
 void BoardInitMcu( void )
@@ -156,6 +160,10 @@ void BoardInitMcu( void )
         RtcInit( );
 
         BoardUnusedIoInit( );
+
+        // I2cInit( &I2c1, I2C_1, I2C_SCL, I2C_SDA );              /////***** Initialize I2C MCU Object (see board.c \NAMote72)
+        I2cInit( &I2c2, I2C_2, I2C2_SCL, I2C2_SDA );           /////***** Initialize I2C MCU Object (see board.c \NAMote72)
+
         if( GetBoardPowerSource( ) == BATTERY_POWER )
         {
             // Disables OFF mode - Enables lowest power mode (STOP)

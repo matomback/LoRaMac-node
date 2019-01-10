@@ -11,7 +11,11 @@
         //     OSX     : /usr/local
         // It is required to uncomment and to fill the following line.
         //"TOOLCHAIN_PREFIX":"/path/to/toolchain",
-        "TOOLCHAIN_PREFIX":"C:/Program Files (x86)/GNU Tools Arm Embedded/7 2018-q2-update",
+        //"TOOLCHAIN_PREFIX":"C:/Program Files (x86)/GNU Tools Arm Embedded/7 2018-q2-update",
+        //"TOOLCHAIN_PREFIX":"C:/PROGRA~2/GNUTOO~1/72018-~1",
+        //"TOOLCHAIN_PREFIX":"C:/Program Files (x86)/GNU Tools ARM Embedded/8 2018-q4-major",
+        //"TOOLCHAIN_PREFIX":"C:/PROGRA~2/GNUTOO~1/72018-~1",
+        "TOOLCHAIN_PREFIX":"C:/Program Files (x86)/GNU Tools ARM Embedded/7 2017-q4-major",
 
         
         // In case your OpenOCD is not installed under the default path:
@@ -20,6 +24,7 @@
         //     OSX     : /usr/local/bin/openocd
         // Please uncomment the following line and fill it accordingly.
         "OPENOCD_BIN":"C:/openocd/bin/openocd.exe",
+        //"OPENOCD_BIN":"C:/msys32/mingw64/bin/openocd.exe",
 
         // Specifies the path to the CMAKE toolchain file.
         "CMAKE_TOOLCHAIN_FILE":"cmake/toolchain-arm-none-eabi.cmake",
@@ -50,6 +55,7 @@
         // Target board, the following boards are supported:
         // NAMote72, NucleoL073 (Default), NucleoL152, NucleoL476, SAML21, SKiM880B, SKiM980A, SKiM881AXL and B-L072Z-LRWAN1.
         "BOARD":"NucleoL073",
+        ////"BOARD":"NAMote72",
         ///// "BOARD":"NucleoL053",
 
 

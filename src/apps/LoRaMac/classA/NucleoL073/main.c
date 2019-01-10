@@ -31,18 +31,11 @@
 #include "Commissioning.h"
 #include "NvmCtxMgmt.h"
 
+/////***** Includes added for SHT21 Implementation
+#include "delay.h"
+#include "sht21.h"           
+// #include "board-config.h"
 
-///// Include header file for sensors readings
-//#include "sensors.h"
-//uint8_t GetTemperatureLevel
-
-// #include <SHT21.h>  // include SHT21 library
-
-// SHT21 sht; 
-
-// float temp; 	// variable to store temperature
-// float humidity; // variable to store hemidity
-/////
 
 
 #ifndef ACTIVE_REGION
@@ -986,6 +979,43 @@ int main( void )
     DeviceState = DEVICE_STATE_RESTORE;
 
     printf( "###### ===== ClassA demo application v1.0.RC1 ==== ######\r\n\r\n" );
+
+
+    /////*****
+    //*******************************************************
+    //  SHT2X CODE 
+    //  From Sensirion SHT21 Sample Code (SHT2x.h)
+    //  and SHT21 MBED examples
+    //*******************************************************
+        
+    uint16_t result_TC = 0;
+    uint16_t result_RH = 0;
+
+    float temperatureC;
+    float humidityRH;
+
+    uint8_t error = 0;
+
+    
+    while(1) {
+      
+        DelayMs(50);
+        
+        error |= SHT2x_Measure(TEMP, &result_TC);
+        temperatureC = SHT2x_CalcTemperatureC(result_TC);
+        //printf( "Temp: %2.2f degC\r\n", temperatureC);
+
+        DelayMs(100);
+
+        error |= SHT2x_Measure(HUMIDITY, &result_RH);
+        humidityRH = SHT2x_CalcRH(result_RH);
+        printf( "Temp: %2.2f degC ; Humidity: %2.2f %%\r\n", temperatureC, humidityRH);
+
+        DelayMs(100);
+    }
+
+    /////*****
+
 
     while( 1 )
     {

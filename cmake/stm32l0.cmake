@@ -30,10 +30,12 @@ message("Linker script: ${LINKER_SCRIPT}")
 #---------------------------------------------------------------------------------------
 
 # Object build options
-set(OBJECT_GEN_FLAGS "-Og -g -mthumb -g2 -fno-builtin -mcpu=cortex-m0plus -Wall -Wextra -pedantic -Wno-unused-parameter -ffunction-sections -fdata-sections -fomit-frame-pointer -mabi=aapcs -fno-unroll-loops -ffast-math -ftree-vectorize")
+set(OBJECT_GEN_FLAGS "-Og -g -mthumb -g2 -fno-builtin -mcpu=cortex-m0plus -Wall -Wextra -pedantic -Wno-unused-parameter -ffunction-sections -fdata-sections -fomit-frame-pointer -mabi=aapcs -fno-unroll-loops -ffast-math -ftree-vectorize -lc -u _printf_float")
 
 # ///// Optimization for size ('-Os'), also turns debug off (no '-g'), only works with release build not debug
-# set(OBJECT_GEN_FLAGS "-Os -mthumb -g2 -fno-builtin -mcpu=cortex-m0plus -Wall -Wextra -pedantic -Wno-unused-parameter -ffunction-sections -fdata-sections -fomit-frame-pointer -mabi=aapcs -fno-unroll-loops -ffast-math -ftree-vectorize")
+# /////***** Added '-lc' and '-u _printf_float' to print floats correctly (see https://stackoverflow.com/questions/12703307/arm-none-eabi-gcc-printing-float-number-using-printf)
+# /////***** Added '-mfloat-abi=soft' (also added in LINKER_FLAGS below)
+#set(OBJECT_GEN_FLAGS "-Os -mthumb -g2 -fno-builtin -mcpu=cortex-m0plus -Wall -Wextra -pedantic -Wno-unused-parameter -ffunction-sections -fdata-sections -fomit-frame-pointer -mabi=aapcs -fno-unroll-loops -ffast-math -ftree-vectorize -lc -u _printf_float")
 
 set(CMAKE_C_FLAGS "${OBJECT_GEN_FLAGS} -std=gnu99 " CACHE INTERNAL "C Compiler options")
 set(CMAKE_CXX_FLAGS "${OBJECT_GEN_FLAGS} -std=c++11 " CACHE INTERNAL "C++ Compiler options")

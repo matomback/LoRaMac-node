@@ -23,15 +23,15 @@ cmake_minimum_required(VERSION 3.6)
 #---------------------------------------------------------------------------------------
 
 file(GLOB ${PROJECT_NAME}_SOURCES "*.c"
-                                  "soft-se/*.c"
-                                  "internal_temp/*.c")                              # /////* Added directory for internal_temp sensor readings
+                                  "soft-se/*.c")
+                                  # "internal_temp/*.c")                              # /////***** Added directory for internal_temp sensor readings
 
 add_library(${PROJECT_NAME} OBJECT EXCLUDE_FROM_ALL ${${PROJECT_NAME}_SOURCES})
 
 target_include_directories( ${PROJECT_NAME} PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/soft-se
-    ${CMAKE_CURRENT_SOURCE_DIR}/internal_temp                                       # /////* Added directory for internal_temp sensor readings
+    # ${CMAKE_CURRENT_SOURCE_DIR}/internal_temp                                       # /////***** Added directory for internal_temp sensor readings
     $<TARGET_PROPERTY:board,INTERFACE_INCLUDE_DIRECTORIES>
     $<TARGET_PROPERTY:system,INTERFACE_INCLUDE_DIRECTORIES>
     $<TARGET_PROPERTY:mac,INTERFACE_INCLUDE_DIRECTORIES>

@@ -109,4 +109,30 @@ uint8_t I2cRead( I2c_t *obj, uint8_t deviceAddr, uint16_t addr, uint8_t *data );
  */
 uint8_t I2cReadBuffer( I2c_t *obj, uint8_t deviceAddr, uint16_t addr, uint8_t *buffer, uint16_t size );
 
+
+
+/////***** Added Read/Write Commands for SHT sensor 
+// -- These functions call SHTI2cMcuRead and SHTI2cMcuWrite which implement HAL_I2C_Master_Receive and HAL_I2C_Master_Transmit respectively
+// -- HAL_I2C_Master_Receive and HAL_I2C_Master_Transmit are called instead of HAL_I2C_Mem_Read and HAL_I2C_Mem_Write 
+
+/*!
+ * \brief Write data to the SHT over I2C 
+ *
+ * \param [IN] obj              I2C object
+ * \param [IN] deviceAddr       device address
+ * \param [OUT] data            data to write
+ */
+uint8_t SHTI2cWrite( I2c_t *obj, uint8_t deviceAddr, uint8_t *data );
+
+/*!
+ * \brief Read data from the SHT over I2C 
+ *
+ * \param [IN] obj              I2C object
+ * \param [IN] deviceAddr       device address
+ * \param [IN] size             size of data (number of bytes)
+ * \param [OUT] data            data to read
+ */
+uint8_t SHTI2cRead( I2c_t *obj, uint8_t deviceAddr, uint8_t *data, uint8_t size );
+
+
 #endif // __I2C_H__

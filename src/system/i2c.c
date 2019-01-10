@@ -128,3 +128,48 @@ uint8_t I2cReadBuffer( I2c_t *obj, uint8_t deviceAddr, uint16_t addr, uint8_t *b
         return FAIL;
     }
 }
+
+
+
+/////***** Added Read/Write Commands for SHT sensor 
+// -- These functions call SHTI2cMcuRead and SHTI2cMcuWrite which implement HAL_I2C_Master_Receive and HAL_I2C_Master_Transmit respectively
+// -- HAL_I2C_Master_Receive and HAL_I2C_Master_Transmit are called instead of HAL_I2C_Mem_Read and HAL_I2C_Mem_Write 
+
+uint8_t SHTI2cWrite( I2c_t *obj, uint8_t deviceAddr, uint8_t *data )
+{
+    if( I2cInitialized == true )
+    {
+        if( SHTI2cMcuWrite( obj, deviceAddr, data, 1 ) == FAIL )
+        {
+            // if first attempt fails due to an IRQ, try a second time
+            if( SHTI2cMcuWrite( obj, deviceAddr, data, 1 ) == FAIL )
+            {
+                return FAIL;
+            }
+            else
+            {
+                return SUCCESS;
+            }
+        }
+        else
+        {
+            return SUCCESS;
+        }
+    }
+    else
+    {
+        return FAIL;
+    }
+}
+
+uint8_t SHTI2cRead( I2c_t *obj, uint8_t deviceAddr, uint8_t *data, uint8_t size )
+{
+    if( I2cInitialized == true )
+    {
+        return( SHTI2cMcuRead( obj, deviceAddr, data, size ) );
+    }
+    else
+    {
+        return FAIL;
+    }
+}

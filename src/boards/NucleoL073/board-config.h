@@ -106,4 +106,7 @@
 #define UART_TX                                     PA_2
 #define UART_RX                                     PA_3
 
+#define I2C2_SCL                                    PB_13       /////***** Added I2C2_SCL line for SHT21 interface
+#define I2C2_SDA                                    PB_14       /////***** Added I2C2_SDA line for SHT21 interface
+
 #endif // __BOARD_CONFIG_H__

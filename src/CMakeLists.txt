@@ -25,8 +25,7 @@ cmake_minimum_required(VERSION 3.6)
 # Allow switching of target platform
 ##### ///// Added support for NucleoL053 *****
 set(BOARD_LIST NAMote72 NucleoL053 NucleoL073 NucleoL152 NucleoL476 SAML21 SKiM880B SKiM980A SKiM881AXL B-L072Z-LRWAN1)
-#set(BOARD NucleoL073 CACHE STRING "Default target platform is NucleoL073")
-set(BOARD NucleoL053 CACHE STRING "Default target platform is NucleoL053")
+set(BOARD NucleoL073 CACHE STRING "Default target platform is NucleoL073")
 set_property(CACHE BOARD PROPERTY STRINGS ${BOARD_LIST})
 
 # Allow switching of MBED shields
@@ -48,7 +47,7 @@ option(USE_USB_CDC "Use USB-Uart" OFF)
 option(USE_BOOTLOADER "Use Bootloader" OFF)
 
 # Switch for debugger support.
-option(USE_DEBUGGER "Use Debugger" ON)
+option(USE_DEBUGGER "Use Debugger" ON)         # /////*****
 
 # Switch for Class B support of LoRaMac.
 option(CLASSB_ENABLED "Class B support of LoRaMac" OFF)
