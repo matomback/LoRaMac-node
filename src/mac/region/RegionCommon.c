@@ -169,8 +169,10 @@ TimerTime_t RegionCommonUpdateBandTimeOff( bool joined, bool dutyCycle, Band_t* 
     {
         if( joined == false )
         {
-            TimerTime_t txDoneTime =  MAX( TimerGetElapsedTime( bands[i].LastJoinTxDoneTime ),
-                                        ( dutyCycle == true ) ? TimerGetElapsedTime( bands[i].LastTxDoneTime ) : 0 );
+            TimerTime_t elapsedJoin = TimerGetElapsedTime( bands[i].LastJoinTxDoneTime );
+            TimerTime_t elapsedTx = TimerGetElapsedTime( bands[i].LastTxDoneTime );
+            TimerTime_t txDoneTime =  MAX( elapsedJoin,
+                                        ( dutyCycle == true ) ? elapsedTx : 0 );
 
             if( bands[i].TimeOff <= txDoneTime )
             {
@@ -185,14 +187,14 @@ TimerTime_t RegionCommonUpdateBandTimeOff( bool joined, bool dutyCycle, Band_t* 
         {
             if( dutyCycle == true )
             {
-                if( bands[i].TimeOff <= TimerGetElapsedTime( bands[i].LastTxDoneTime ) )
+                TimerTime_t elapsed = TimerGetElapsedTime( bands[i].LastTxDoneTime );
+                if( bands[i].TimeOff <= elapsed )
                 {
                     bands[i].TimeOff = 0;
                 }
                 if( bands[i].TimeOff != 0 )
                 {
-                    nextTxDelay = MIN( bands[i].TimeOff - TimerGetElapsedTime( bands[i].LastTxDoneTime ),
-                                       nextTxDelay );
+                    nextTxDelay = MIN( bands[i].TimeOff - elapsed, nextTxDelay );
                 }
             }
             else
