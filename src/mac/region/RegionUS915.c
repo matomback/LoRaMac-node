@@ -32,6 +32,7 @@
 
 #include "RegionCommon.h"
 #include "RegionUS915.h"
+#include "board-config.h"           /////***** Header file for custom application definitions (i.e. TESTING macro)
 
 // Definitions
 #define CHANNELS_MASK_SIZE              6
@@ -517,13 +518,28 @@ void RegionUS915InitDefaults( InitDefaultsParams_t* params )
                 NvmCtx.Channels[i].Band = 0;
             }
 
-            // ChannelsMask
-            NvmCtx.ChannelsDefaultMask[0] = 0xFFFF;
-            NvmCtx.ChannelsDefaultMask[1] = 0xFFFF;
-            NvmCtx.ChannelsDefaultMask[2] = 0xFFFF;
-            NvmCtx.ChannelsDefaultMask[3] = 0xFFFF;
-            NvmCtx.ChannelsDefaultMask[4] = 0x00FF;
-            NvmCtx.ChannelsDefaultMask[5] = 0x0000;
+            /////**** Sets Device Channel Mask to reduced channels if TESTING defined - for testing with Kerlink gateway
+            #ifdef TESTING
+            {
+                /////**** Testing Mode - sets channel mask to only 1st sub-band (& 500kHz channs), violates US915 LoRa regional spec but okay for tests
+                NvmCtx.ChannelsDefaultMask[0] = 0x00FF;     // enable first sub-band
+                NvmCtx.ChannelsDefaultMask[1] = 0x0000;
+                NvmCtx.ChannelsDefaultMask[2] = 0x0000;
+                NvmCtx.ChannelsDefaultMask[3] = 0x0000;
+                NvmCtx.ChannelsDefaultMask[4] = 0x00FF;     // enable 500 kHz channels
+                NvmCtx.ChannelsDefaultMask[5] = 0x0000;
+            }
+            #else
+            {
+                // ChannelsMask (default)
+                NvmCtx.ChannelsDefaultMask[0] = 0xFFFF;
+                NvmCtx.ChannelsDefaultMask[1] = 0xFFFF;
+                NvmCtx.ChannelsDefaultMask[2] = 0xFFFF;
+                NvmCtx.ChannelsDefaultMask[3] = 0xFFFF;
+                NvmCtx.ChannelsDefaultMask[4] = 0x00FF;
+                NvmCtx.ChannelsDefaultMask[5] = 0x0000;
+            }
+            #endif
 
             // Copy channels default mask
             RegionCommonChanMaskCopy( NvmCtx.ChannelsMask, NvmCtx.ChannelsDefaultMask, 6 );

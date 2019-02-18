@@ -27,7 +27,7 @@
 #include "utilities.h"
 #include "lpm-board.h"
 
-static uint32_t StopModeDisable = 0;
+static uint32_t StopModeDisable = 1;     /////***** Changed to 1 so goes into sleep mode by default, still must confirm LpmMode is working currectly
 static uint32_t OffModeDisable = 0;
 
 void LpmSetOffMode( LpmId_t id, LpmSetMode_t mode )

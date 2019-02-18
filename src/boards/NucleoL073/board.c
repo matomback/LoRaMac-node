@@ -420,6 +420,8 @@ void LpmExitStopMode( void )
 void LpmEnterSleepMode( void)
 {
     HAL_PWR_EnterSLEEPMode(PWR_MAINREGULATOR_ON, PWR_SLEEPENTRY_WFI);
+    // HAL_PWR_EnterSLEEPMode(PWR_LOWPOWERREGULATOR_ON, PWR_SLEEPENTRY_WFI);        /////***** Put board into LP Sleep Mode instead of Sleep Mode  (also try '_WFE' for wake on events)
+    // I2cDeInit(&I2c_2);                                                           /////***** Deinitialize I2C for sleep mode (?) 
 }
 
 void BoardLowPowerHandler( void )

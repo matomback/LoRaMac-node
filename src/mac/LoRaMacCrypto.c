@@ -1023,7 +1023,11 @@ LoRaMacCryptoStatus_t LoRaMacCryptoPrepareJoinRequest( LoRaMacMessageJoinRequest
     // Add device nonce
     CryptoCtx.NvmCtx->DevNonce++;
     CryptoCtx.EventCryptoNvmCtxChanged( );
-    macMsg->DevNonce = CryptoCtx.NvmCtx->DevNonce;
+
+    /////***** DevNonce management in order to ensure will consistently join to server after multiple attempts/power cycles
+    // macMsg->DevNonce = CryptoCtx.NvmCtx->DevNonce;      /////***** Permanent Fix - Devnonce saved in NVM (if enabled) is also stored in macMsg to sync with gateway (NvmCtx still under development) 
+    macMsg->DevNonce = randr(0, 0xFFFF);                /////***** Testing Fix - Randomize DevNonce
+    CryptoCtx.NvmCtx->DevNonce = macMsg->DevNonce;
 
     // Derive lifetime session keys
     retval = DeriveLifeTimeSessionKey( J_S_INT_KEY, macMsg->DevEUI );

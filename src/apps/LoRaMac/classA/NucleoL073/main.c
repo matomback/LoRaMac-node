@@ -31,10 +31,10 @@
 #include "Commissioning.h"
 #include "NvmCtxMgmt.h"
 
-/////***** Includes added for SHT21 Implementation
+/////***** Includes added for SHT21 Implementation, Testing Mode, etc..
 #include "delay.h"
 #include "sht21.h"           
-// #include "board-config.h"
+#include "board-config.h"
 
 
 
@@ -50,14 +50,13 @@
 /*!
  * Defines the application data transmission duty cycle. 5s, value in [ms].
  */
-///// Changed for longer transaction (30s)
 #define APP_TX_DUTYCYCLE                            5000
+static uint16_t custom_tx_dutycycle = 5000;                     /////***** use instead of APP_TX_DUTYCYCLE to change dutycycle mid-app (after Join)
 
 /*!
  * Defines a random delay for application data transmission duty cycle. 1s,
  * value in [ms].
  */
-///// Changed added TX delay time (10s)
 #define APP_TX_DUTYCYCLE_RND                        1000
 
 /*!
@@ -351,7 +350,8 @@ static void JoinNetwork( void )
     // Starts the join procedure
     status = LoRaMacMlmeRequest( &mlmeReq );
     printf( "\r\n###### ===== MLME-Request - MLME_JOIN ==== ######\r\n" );
-    printf( "STATUS      : %s\r\n", MacStatusStrings[status] );
+    printf( "\tSTATUS      : %s\r\n", MacStatusStrings[status] );               /////***** Debug added
+    printf( "\tJOIN DR     : %d\r\n", mlmeReq.Req.Join.Datarate);               /////***** Debug added 
 
     if( status == LORAMAC_STATUS_OK )
     {
@@ -364,6 +364,90 @@ static void JoinNetwork( void )
     }
 }
 
+
+
+/////*****
+//*******************************************************
+//  SHT2X CODE (Read) 
+//  From Sensirion SHT21 Sample Code (SHT2x.h)
+//  and SHT21 MBED examples
+//*******************************************************
+
+float temperatureC;
+float humidityRH;
+
+union ufloat {
+    float f;
+    unsigned u;
+} utemp, urh;
+
+static void ReadSHT(void) 
+{
+    uint16_t result_TC;
+    uint16_t result_RH;
+
+    uint8_t error = 0;
+
+    error |= SHT2x_Measure(TEMP, &result_TC);
+    temperatureC = SHT2x_CalcTemperatureC(result_TC);
+    DelayMs(100);
+
+    error |= SHT2x_Measure(HUMIDITY, &result_RH);
+    humidityRH = SHT2x_CalcRH(result_RH); 
+}
+
+
+
+/////*****
+//*******************************************************
+//  Lora Interrupt Initialization and Functions 
+//  
+//*******************************************************
+
+Gpio_t Int_moisture;
+Gpio_t Int_short;
+
+bool moistureIrqFired = false;                  // Tracks if moisture interrupt fired, sent as a byte over Lora packet
+static TimerEvent_t MoistureTimer;
+static uint16_t moisture_refractory = 5000;     // Moisture interrupt refractory period
+
+typedef void ( LoraIrqHandler )( void* context );
+
+/////***** Lora Interrupt Initialization
+void LoraIrqInit ( LoraIrqHandler hIrq )
+{
+    GpioInit( &Int_moisture, INT_M, PIN_INPUT, PIN_PUSH_PULL, PIN_PULL_DOWN, 1 );               // Initializes INT_M pin as input pulled up
+    GpioInit( &Int_short, INT_S, PIN_OUTPUT, PIN_PUSH_PULL, PIN_PULL_UP, 1 );                   // Initializes INT_S pin as output low
+    GpioSetInterrupt( &Int_moisture, IRQ_RISING_FALLING_EDGE, IRQ_HIGH_PRIORITY, hIrq );        // Sets interrupt (type, priority, handler)
+}
+
+/////***** Interrupt Handler for Lora Moisture Interrupt
+void moistureHandler(void* context)
+{
+    if (moistureIrqFired == false)
+    {
+        printf("MOISTURE DETECTED!!!\r\n");
+        moistureIrqFired = true;
+        TimerStart( &MoistureTimer );
+
+        NextTx = true;
+        DeviceState = DEVICE_STATE_SEND;
+    }
+    else
+    {
+        return;
+    }
+}
+
+/////***** Timeout Handler for Lora Moisture Interrupt Timer Timeout
+static void OnMoistureTimerEvent( void* context )
+{
+    TimerStop( &MoistureTimer );
+    moistureIrqFired = false;
+}
+
+
+
 /*!
  * \brief   Prepares the payload of the frame
  */
@@ -375,13 +459,27 @@ static void PrepareTxFrame( uint8_t port )
         {
             // AppDataSizeBackup = AppDataSize = 1;
             // AppDataBuffer[0] = AppLedStateOn;
-            AppDataSize = 6;
-            AppDataBuffer[0] = (uint8_t)84;
-            AppDataBuffer[1] = (uint8_t)101;
-            AppDataBuffer[2] = (uint8_t)109;
-            AppDataBuffer[3] = (uint8_t)112;
-            AppDataBuffer[4] = (uint8_t)58;
-            AppDataBuffer[5] = (uint8_t)32;
+
+            // Encodes packet that reads "TEMP: "
+            // AppDataSize = 6;
+            // AppDataBuffer[0] = (uint8_t)84;
+            // AppDataBuffer[1] = (uint8_t)101;
+            // AppDataBuffer[2] = (uint8_t)109;
+            // AppDataBuffer[3] = (uint8_t)112;
+            // AppDataBuffer[4] = (uint8_t)58;
+            // AppDataBuffer[5] = (uint8_t)32;
+
+            // Encodes packet with temp and humidity (MSB first), and moisture interrupt
+            AppDataSize = 9;
+            AppDataBuffer[0] = (utemp.u >> 24) &0xFF;
+            AppDataBuffer[1] = (utemp.u >> 16) &0xFF;
+            AppDataBuffer[2] = (utemp.u >> 8) &0xFF;
+            AppDataBuffer[3] = (utemp.u &0xFF);
+            AppDataBuffer[4] = (urh.u >> 24) &0xFF;
+            AppDataBuffer[5] = (urh.u >> 16) &0xFF;
+            AppDataBuffer[6] = (urh.u >> 8) &0xFF;
+            AppDataBuffer[7] = (urh.u &0xFF);
+            AppDataBuffer[8] = moistureIrqFired;
         }
         break;
     case 224:
@@ -626,6 +724,21 @@ static void McpsConfirm( McpsConfirm_t *mcpsConfirm )
     }
 
     printf( "\r\n" );
+
+    /////***** Testing Mode
+    #ifdef TESTING
+    {
+        uint8_t testing_uplinks = 20;
+
+        // sends 20 uplinks and then stops (sleeps indefinitely)
+        if (mcpsConfirm->UpLinkCounter == testing_uplinks)
+        {
+                printf("\r\n ***** TESTING COMPLETE ***** \r\n");
+                TimerStop( &TxNextPacketTimer );
+                DeviceState = DEVICE_STATE_SLEEP;
+        }
+    }
+    #endif
 }
 
 /*!
@@ -867,7 +980,8 @@ static void McpsIndication( McpsIndication_t *mcpsIndication )
 static void MlmeConfirm( MlmeConfirm_t *mlmeConfirm )
 {
     printf( "\r\n###### ===== MLME-Confirm ==== ######\r\n" );
-    printf( "STATUS      : %s\r\n", EventInfoStatusStrings[mlmeConfirm->Status] );
+    printf( "\tSTATUS      : %s\r\n", EventInfoStatusStrings[mlmeConfirm->Status] );    /////***** Debug added for MlmeConfirm status
+
     if( mlmeConfirm->Status != LORAMAC_EVENT_INFO_STATUS_OK )
     {
     }
@@ -892,6 +1006,12 @@ static void MlmeConfirm( MlmeConfirm_t *mlmeConfirm )
                 printf( "\r\n" );
                 // Status is OK, node has joined the network
                 DeviceState = DEVICE_STATE_SEND;
+
+                #ifndef TESTING
+                {
+                    custom_tx_dutycycle = 30000;    /////***** Change to 20s dutycycle after join (only if not in TESTING mode)
+                }
+                #endif
             }
             else
             {
@@ -965,6 +1085,8 @@ int main( void )
     BoardInitMcu( );
     BoardInitPeriph( );
 
+    LoraIrqInit ( moistureHandler );        /////***** Lora Moisture Interrupt initialization 
+
     macPrimitives.MacMcpsConfirm = McpsConfirm;
     macPrimitives.MacMcpsIndication = McpsIndication;
     macPrimitives.MacMlmeConfirm = MlmeConfirm;
@@ -979,42 +1101,6 @@ int main( void )
     DeviceState = DEVICE_STATE_RESTORE;
 
     printf( "###### ===== ClassA demo application v1.0.RC1 ==== ######\r\n\r\n" );
-
-
-    /////*****
-    //*******************************************************
-    //  SHT2X CODE 
-    //  From Sensirion SHT21 Sample Code (SHT2x.h)
-    //  and SHT21 MBED examples
-    //*******************************************************
-        
-    uint16_t result_TC = 0;
-    uint16_t result_RH = 0;
-
-    float temperatureC;
-    float humidityRH;
-
-    uint8_t error = 0;
-
-    
-    while(1) {
-      
-        DelayMs(50);
-        
-        error |= SHT2x_Measure(TEMP, &result_TC);
-        temperatureC = SHT2x_CalcTemperatureC(result_TC);
-        //printf( "Temp: %2.2f degC\r\n", temperatureC);
-
-        DelayMs(100);
-
-        error |= SHT2x_Measure(HUMIDITY, &result_RH);
-        humidityRH = SHT2x_CalcRH(result_RH);
-        printf( "Temp: %2.2f degC ; Humidity: %2.2f %%\r\n", temperatureC, humidityRH);
-
-        DelayMs(100);
-    }
-
-    /////*****
 
 
     while( 1 )
@@ -1038,6 +1124,7 @@ int main( void )
                 }
                 else
                 {
+                    printf( "\r\n###### ===== CTXS **NOT** RESTORED ==== ######\r\n\r\n" );     /////***** Debug added - msg for Nvm CTXS fail to restore
                     mibReq.Type = MIB_APP_KEY;
                     mibReq.Param.AppKey = AppKey;
                     LoRaMacMibSetRequestConfirm( &mibReq );
@@ -1104,6 +1191,9 @@ int main( void )
 
                 TimerInit( &Led2Timer, OnLed2TimerEvent );
                 TimerSetValue( &Led2Timer, 25 );
+
+                TimerInit( &MoistureTimer, OnMoistureTimerEvent );                      /////***** Initialize moisture interrupt refractory timer
+                TimerSetValue( &MoistureTimer, moisture_refractory );                   /////***** Set moisture interrupt refractory period
 
                 mibReq.Type = MIB_PUBLIC_NETWORK;
                 mibReq.Param.EnablePublicNetwork = LORAWAN_PUBLIC_NETWORK;
@@ -1195,6 +1285,15 @@ int main( void )
             {
                 if( NextTx == true )
                 {
+                    ReadSHT();
+                    utemp.f = temperatureC;     // saves temp float in utemp union
+                    urh.f = humidityRH;         // saves rh float in utrh union
+                    /////***** SHT Debug
+                    // printf( "\t Temp Float: %2.2f degC \r\n", temperatureC);                    // print temp as float
+                    // printf( "\t Temp Float Hex: %x \r\n", temperatureC);                        // print temp as hex (temp is float)                 - incorrect arrangement of bytes for float
+                    // printf( "\t Temp Float Hex Cast: %x \r\n", (uint32_t)temperatureC);         // print temp as hex (temp is cast to int)           - incorrect - returns 0x 17 instead of 4 bytes    
+                    // printf( "\t Temp HEX: %x \r\n", utemp.u);                                   // print temp as hex (temp is unsigned from union)   - *** correct arrangement of bytes for float
+
                     PrepareTxFrame( AppPort );
 
                     NextTx = SendFrame( );
@@ -1213,7 +1312,8 @@ int main( void )
                 else
                 {
                     // Schedule next packet transmission
-                    TxDutyCycleTime = APP_TX_DUTYCYCLE + randr( -APP_TX_DUTYCYCLE_RND, APP_TX_DUTYCYCLE_RND );
+                    // TxDutyCycleTime = APP_TX_DUTYCYCLE + randr( -APP_TX_DUTYCYCLE_RND, APP_TX_DUTYCYCLE_RND );
+                    TxDutyCycleTime = custom_tx_dutycycle + randr( -APP_TX_DUTYCYCLE_RND, APP_TX_DUTYCYCLE_RND );       /////***** Changed to variable tx_dutycycle
                 }
 
                 // Schedule next packet transmission
