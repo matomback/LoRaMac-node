@@ -47,7 +47,7 @@ option(USE_USB_CDC "Use USB-Uart" OFF)
 option(USE_BOOTLOADER "Use Bootloader" OFF)
 
 # Switch for debugger support.
-option(USE_DEBUGGER "Use Debugger" ON)         # /////*****
+#option(USE_DEBUGGER "Use Debugger" OFF)         # /////***** Default ON
 
 # Switch for Class B support of LoRaMac.
 option(CLASSB_ENABLED "Class B support of LoRaMac" OFF)

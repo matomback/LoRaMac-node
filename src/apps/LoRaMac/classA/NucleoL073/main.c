@@ -368,19 +368,42 @@ static void JoinNetwork( void )
 
 /////*****
 //*******************************************************
-//  SHT2X CODE (Read) 
-//  From Sensirion SHT21 Sample Code (SHT2x.h)
+//  SENSOR CODE (Read) 
+//  parts from Sensirion SHT21 Sample Code (SHT2x.h)
 //  and SHT21 MBED examples
 //*******************************************************
 
+// Sensor Readings in Float Format
 float temperatureC;
 float humidityRH;
 
+// Sensor Readings in Integer Format for Cayenne LPP Encoding
+signed temperatureC_int;
+unsigned humidityRH_int;
+
+// Union for reading sensor bytes as both float and unsigned 
 union ufloat {
     float f;
     unsigned u;
 } utemp, urh;
 
+// Interrupt GPIO Pin Objects
+Gpio_t Int_moisture;
+Gpio_t Int_short;
+
+// Moisture Detection
+static uint8_t moisture_value = 0;
+static bool moistureIrqFired = false;           // Tracks if moisture interrupt has been fired, sent as a byte over Lora packet
+static TimerEvent_t MoistureTimer;              // Timer instance for moisture refractory period (moistureIrqFired resets)
+static uint16_t moisture_refractory = 5000;
+
+// Timeout Handler for Lora Moisture Timer Timeout
+static void OnMoistureTimerEvent( void* context )
+{
+    moistureIrqFired = false;
+}
+
+// Function for Reading SHT sensor and Moisture sensor
 static void ReadSHT(void) 
 {
     uint16_t result_TC;
@@ -390,10 +413,39 @@ static void ReadSHT(void)
 
     error |= SHT2x_Measure(TEMP, &result_TC);
     temperatureC = SHT2x_CalcTemperatureC(result_TC);
-    DelayMs(100);
+    temperatureC_int = (signed)(temperatureC*10);           // Converts calculated sensor value (float) to signed int, encoded for Cayenne LPP Temperature format
+
+    //DelayMs(5);
 
     error |= SHT2x_Measure(HUMIDITY, &result_RH);
     humidityRH = SHT2x_CalcRH(result_RH); 
+    humidityRH_int = (unsigned)(humidityRH*2);              // Converts calculated sensor value (float) to unsigned int, encoded for Cayenne LPP Humidity format
+
+    // Polling Moisture Sensor
+    #ifndef LORA_INTERRUPT
+        
+        //***** Polling - Pin Alone - Int_moisture pin pulled high (sense if low) -- only when in contact, not through water
+        // GpioWrite( &Int_moisture, 1);
+        // DelayMs(50);
+
+        //***** Polling - Pin Alone - Int_moisture pin pulled low (sense if high) -- works through water as well as contact, can 'reset' pin reliably
+        // GpioWrite( &Int_moisture, 0);
+        // DelayMs(50);
+
+        moisture_value = GpioRead( &Int_moisture );
+
+        if (moisture_value == 1)
+        {
+            printf("MOISTURE DETECTED!!!\r\n");
+            moistureIrqFired = true;            // Set MoistureIrqFired Status to True
+            TimerStart( &MoistureTimer );       // Set timer to reset moistureIrqFired Status
+
+            // NextTx = true;
+            // DeviceState = DEVICE_STATE_SEND;
+        }
+
+    #endif
+
 }
 
 
@@ -404,20 +456,17 @@ static void ReadSHT(void)
 //  
 //*******************************************************
 
-Gpio_t Int_moisture;
-Gpio_t Int_short;
-
-bool moistureIrqFired = false;                  // Tracks if moisture interrupt fired, sent as a byte over Lora packet
-static TimerEvent_t MoistureTimer;
-static uint16_t moisture_refractory = 5000;     // Moisture interrupt refractory period
-
 typedef void ( LoraIrqHandler )( void* context );
 
 /////***** Lora Interrupt Initialization
 void LoraIrqInit ( LoraIrqHandler hIrq )
 {
-    GpioInit( &Int_moisture, INT_M, PIN_INPUT, PIN_PUSH_PULL, PIN_PULL_DOWN, 1 );               // Initializes INT_M pin as input pulled up
-    GpioInit( &Int_short, INT_S, PIN_OUTPUT, PIN_PUSH_PULL, PIN_PULL_UP, 1 );                   // Initializes INT_S pin as output low
+    // Int_moisture pin pulled high (sense rising/falling) -- only when in contact, not through water
+    // Int_moisture pin pulled low (sense rising/falling) -- works through water as well as contact, a bit difficult to 'reset' pin reliably
+    GpioInit( &Int_moisture, INT_M, PIN_INPUT, PIN_PUSH_PULL, PIN_PULL_DOWN, 0 );               // Initializes INT_M pin as input pulled low
+    GpioInit( &Int_short, INT_S, PIN_OUTPUT, PIN_PUSH_PULL, PIN_PULL_UP, 1 );                   // Initializes INT_S pin as output high
+    // GpioInit( &Int_moisture, INT_M, PIN_INPUT, PIN_PUSH_PULL, PIN_PULL_UP, 1 );                 // Initializes INT_M pin as input pulled up
+    // GpioInit( &Int_short, INT_S, PIN_OUTPUT, PIN_PUSH_PULL, PIN_PULL_DOWN, 0 );                 // Initializes INT_S pin as output low
     GpioSetInterrupt( &Int_moisture, IRQ_RISING_FALLING_EDGE, IRQ_HIGH_PRIORITY, hIrq );        // Sets interrupt (type, priority, handler)
 }
 
@@ -427,11 +476,13 @@ void moistureHandler(void* context)
     if (moistureIrqFired == false)
     {
         printf("MOISTURE DETECTED!!!\r\n");
-        moistureIrqFired = true;
-        TimerStart( &MoistureTimer );
 
-        NextTx = true;
-        DeviceState = DEVICE_STATE_SEND;
+        GpioWrite( &Int_moisture, 0);       // Make sure Moisture Pin set low again
+        moistureIrqFired = true;            // Set moistureIrqFired Status to True
+        TimerStart( &MoistureTimer );       // Set timer to reset moistureIrqFired Status
+
+        NextTx = true;                      // Prepare next Tx to send uplink with Moisture Alert
+        DeviceState = DEVICE_STATE_SEND;    // Set Device State to send uplink with Moisture Alert
     }
     else
     {
@@ -439,13 +490,60 @@ void moistureHandler(void* context)
     }
 }
 
-/////***** Timeout Handler for Lora Moisture Interrupt Timer Timeout
-static void OnMoistureTimerEvent( void* context )
-{
-    TimerStop( &MoistureTimer );
-    moistureIrqFired = false;
-}
 
+
+
+/////*****
+//*******************************************************
+//  Cayenne LPP - Payload Encoding
+//  
+//*******************************************************
+
+// Cayenne LPP Application Port
+#define CAYENNE_LPP_PORT                            3
+
+// Sensor Status (Enabled/Disabled)
+static bool MoistureOn = true;
+static bool TemperatureOn = true;
+static bool HumidityOn = true;
+
+// Constants For Data Types
+#define LPP_DIGITAL_INPUT       0       // 1 byte
+#define LPP_DIGITAL_OUTPUT      1       // 1 byte
+#define LPP_ANALOG_INPUT        2       // 2 bytes, 0.01 signed
+#define LPP_ANALOG_OUTPUT       3       // 2 bytes, 0.01 signed
+#define LPP_LUMINOSITY          101     // 2 bytes, 1 lux unsigned
+#define LPP_PRESENCE            102     // 1 byte, 1
+#define LPP_TEMPERATURE         103     // 2 bytes, 0.1°C signed
+#define LPP_RELATIVE_HUMIDITY   104     // 1 byte, 0.5% unsigned
+#define LPP_ACCELEROMETER       113     // 2 bytes per axis, 0.001G
+#define LPP_BAROMETRIC_PRESSURE 115     // 2 bytes 0.1 hPa Unsigned
+#define LPP_GYROMETER           134     // 2 bytes per axis, 0.01 °/s
+#define LPP_GPS                 136     // 3 byte lon/lat 0.0001 °, 3 bytes alt 0.01m  (9 bytes total)
+
+// Constants for Sensor Byte Size   (Byte Size = Data ID (1) + Data Type (1) + Data Size)
+#define LPP_DIGITAL_INPUT_SIZE       3
+#define LPP_DIGITAL_OUTPUT_SIZE      3
+#define LPP_ANALOG_INPUT_SIZE        4
+#define LPP_ANALOG_OUTPUT_SIZE       4
+#define LPP_LUMINOSITY_SIZE          4
+#define LPP_PRESENCE_SIZE            3
+#define LPP_TEMPERATURE_SIZE         4
+#define LPP_RELATIVE_HUMIDITY_SIZE   3
+#define LPP_ACCELEROMETER_SIZE       8
+#define LPP_BAROMETRIC_PRESSURE_SIZE 4
+#define LPP_GYROMETER_SIZE           8
+#define LPP_GPS_SIZE                 11
+
+
+
+
+
+/////
+//*******************************************************
+//  Payload Formation
+//  
+//*******************************************************
 
 
 /*!
@@ -480,6 +578,52 @@ static void PrepareTxFrame( uint8_t port )
             AppDataBuffer[6] = (urh.u >> 8) &0xFF;
             AppDataBuffer[7] = (urh.u &0xFF);
             AppDataBuffer[8] = moistureIrqFired;
+        }
+        break;
+    /////***** Cayenne encoding
+    // (see https://mydevices.com/cayenne/docs/lora/#lora-cayenne-low-power-payload)
+    case 3: 
+        {
+
+            // Set AppDataSize (case 3 application - Cayenne encoding)
+            AppDataSize = 0;
+
+            uint8_t b = 0;
+
+            if( MoistureOn == true )
+            {
+                AppDataSize += LPP_DIGITAL_INPUT_SIZE;
+                AppDataBuffer[b++] = 1;                         // Channel ()
+                AppDataBuffer[b++] = LPP_DIGITAL_INPUT;         // Type: Digital Input -- 1 byte, 1 bit resolution
+                AppDataBuffer[b++] = moistureIrqFired;
+            }
+            if( HumidityOn == true )
+            {
+                AppDataSize += LPP_RELATIVE_HUMIDITY_SIZE;
+                AppDataBuffer[b++] = 2;                         // Channel ()
+                AppDataBuffer[b++] = LPP_RELATIVE_HUMIDITY;     // Type: Humidity -- 1 byte, 0.5% unsigned
+                AppDataBuffer[b++] = humidityRH_int &0xFF;
+            }
+            if( TemperatureOn == true )
+            {
+                AppDataSize += LPP_TEMPERATURE_SIZE;
+                AppDataBuffer[b++] = 3;                         // Channel ()
+                AppDataBuffer[b++] = LPP_TEMPERATURE;           // Type: Temp -- 2 bytes, 0.1C signed MSB
+                AppDataBuffer[b++] = (temperatureC_int >> 8) &0xFF;
+                AppDataBuffer[b++] = temperatureC_int &0xFF;
+            }
+
+            // AppDataSize = LPP_DIGITAL_INPUT_SIZE + LPP_RELATIVE_HUMIDITY_SIZE + LPP_TEMPERATURE_SIZE;
+            // AppDataBuffer[0] = 1;                       // Channel ()
+            // AppDataBuffer[1] = LPP_DIGITAL_INPUT;       // Type: Digital Input -- 1 byte, 1 bit resolution
+            // AppDataBuffer[2] = moistureIrqFired;        
+            // AppDataBuffer[3] = 2;                       // Channel ()
+            // AppDataBuffer[4] = LPP_RELATIVE_HUMIDITY;   // Type: Humidity -- 1 byte, 0.5% unsigned
+            // AppDataBuffer[5] = humidityRH_int &0xFF;
+            // AppDataBuffer[6] = 3;                       // Channel ()
+            // AppDataBuffer[7] = LPP_TEMPERATURE;         // Type: Temp -- 2 bytes, 0.1C signed MSB
+            // AppDataBuffer[8] = (temperatureC_int >> 8) &0xFF;
+            // AppDataBuffer[9] = temperatureC_int &0xFF;
         }
         break;
     case 224:
@@ -727,7 +871,6 @@ static void McpsConfirm( McpsConfirm_t *mcpsConfirm )
 
     /////***** Testing Mode
     #ifdef TESTING
-    {
         uint8_t testing_uplinks = 20;
 
         // sends 20 uplinks and then stops (sleeps indefinitely)
@@ -735,9 +878,9 @@ static void McpsConfirm( McpsConfirm_t *mcpsConfirm )
         {
                 printf("\r\n ***** TESTING COMPLETE ***** \r\n");
                 TimerStop( &TxNextPacketTimer );
+                
                 DeviceState = DEVICE_STATE_SLEEP;
         }
-    }
     #endif
 }
 
@@ -1085,7 +1228,13 @@ int main( void )
     BoardInitMcu( );
     BoardInitPeriph( );
 
-    LoraIrqInit ( moistureHandler );        /////***** Lora Moisture Interrupt initialization 
+    /////***** Setup Moisture Handler to Use Interrupt Method or Polling Method
+    #ifdef LORA_INTERRUPT
+        LoraIrqInit( moistureHandler );         ////***** Lora Moisture Interrupt initialization
+    #else
+        GpioInit( &Int_moisture, INT_M, PIN_INPUT, PIN_PUSH_PULL, PIN_PULL_DOWN, 0 );               // Initializes INT_M pin as input pulled low
+        GpioInit( &Int_short, INT_S, PIN_OUTPUT, PIN_PUSH_PULL, PIN_PULL_UP, 1 );                   // Initializes INT_S pin as output high
+    #endif
 
     macPrimitives.MacMcpsConfirm = McpsConfirm;
     macPrimitives.MacMcpsIndication = McpsIndication;
@@ -1192,8 +1341,8 @@ int main( void )
                 TimerInit( &Led2Timer, OnLed2TimerEvent );
                 TimerSetValue( &Led2Timer, 25 );
 
-                TimerInit( &MoistureTimer, OnMoistureTimerEvent );                      /////***** Initialize moisture interrupt refractory timer
-                TimerSetValue( &MoistureTimer, moisture_refractory );                   /////***** Set moisture interrupt refractory period
+                TimerInit( &MoistureTimer, OnMoistureTimerEvent );                      /////***** Initialize moisture refractory timer (reset moistureIrqStatus)
+                TimerSetValue( &MoistureTimer, moisture_refractory );                   /////***** Set moisture refractory period (reset moistureIrqSatuts)
 
                 mibReq.Type = MIB_PUBLIC_NETWORK;
                 mibReq.Param.EnablePublicNetwork = LORAWAN_PUBLIC_NETWORK;
@@ -1288,11 +1437,15 @@ int main( void )
                     ReadSHT();
                     utemp.f = temperatureC;     // saves temp float in utemp union
                     urh.f = humidityRH;         // saves rh float in utrh union
+
+                    AppPort = CAYENNE_LPP_PORT; // send payload using Cayenne LPP formatting
+
                     /////***** SHT Debug
-                    // printf( "\t Temp Float: %2.2f degC \r\n", temperatureC);                    // print temp as float
-                    // printf( "\t Temp Float Hex: %x \r\n", temperatureC);                        // print temp as hex (temp is float)                 - incorrect arrangement of bytes for float
-                    // printf( "\t Temp Float Hex Cast: %x \r\n", (uint32_t)temperatureC);         // print temp as hex (temp is cast to int)           - incorrect - returns 0x 17 instead of 4 bytes    
-                    // printf( "\t Temp HEX: %x \r\n", utemp.u);                                   // print temp as hex (temp is unsigned from union)   - *** correct arrangement of bytes for float
+                    printf( "\t Temp Float: %2.2f degC \r\n", temperatureC);        // print temp float as float
+                    printf( "\t Temp Float Hex: %x \r\n", temperatureC);            // print temp float as hex              - incorrect arrangement of bytes for float
+                    printf( "\t Temp Unsigned HEX: %x \r\n", utemp.u);              // print temp unsigned (union) as hex   - * correct arrangement of bytes for float
+                    printf( "\t Temp Float HEX: %x \r\n", utemp.f);                 // print temp float (union) as hex     
+                    printf( "\t Temp HEX Cayenne: %x \r\n", temperatureC_int);      // print temp int (cayenne format) as hex 
 
                     PrepareTxFrame( AppPort );
 
@@ -1303,6 +1456,7 @@ int main( void )
             }
             case DEVICE_STATE_CYCLE:
             {
+                ReadSHT();
                 DeviceState = DEVICE_STATE_SLEEP;
                 if( ComplianceTest.Running == true )
                 {
@@ -1338,6 +1492,9 @@ int main( void )
                 {
                     // The MCU wakes up through events
                     BoardLowPowerHandler( );
+
+                    /////*** Make Restore - so handles properly after comes out of stop mode
+                    //DeviceState = DEVICE_STATE_RESTORE;
                 }
                 CRITICAL_SECTION_END( );
                 break;

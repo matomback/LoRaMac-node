@@ -34,7 +34,8 @@
 #define __BOARD_CONFIG_H__
 
 /////***** Custom application definitions
-#define TESTING                                                 // TESTING MODE - sets channel mask to only first sub-band,
+#define TESTING                                                 /////***** TESTING Mode - sets channel mask to only first sub-band
+//#define LORA_INTERRUPT                                          /////***** INTERRUPT Mode - sets moisture sensor to use interrupt instead of polling method
 
 #define I2C2_SCL                                    PB_13       /////***** Added I2C2_SCL line for SHT21 interface
 #define I2C2_SDA                                    PB_14       /////***** Added I2C2_SDA line for SHT21 interface

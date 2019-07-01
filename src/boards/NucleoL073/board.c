@@ -149,7 +149,7 @@ void BoardInitMcu( void )
 
         SystemClockConfig( );
 
-        UsbIsConnected = true;
+        UsbIsConnected = true;                                  /////*****
 
         FifoInit( &Uart2.FifoTx, Uart2TxBuffer, UART2_FIFO_TX_SIZE );
         FifoInit( &Uart2.FifoRx, Uart2RxBuffer, UART2_FIFO_RX_SIZE );
@@ -159,10 +159,13 @@ void BoardInitMcu( void )
 
         RtcInit( );
 
-        BoardUnusedIoInit( );
+        BoardUnusedIoInit( );                                   /////***** Calls HAL functions that enable the Debug Module during SLEEP/STOP/STANDBY modes
 
         // I2cInit( &I2c1, I2C_1, I2C_SCL, I2C_SDA );              /////***** Initialize I2C MCU Object (see board.c \NAMote72)
         I2cInit( &I2c2, I2C_2, I2C2_SCL, I2C2_SDA );           /////***** Initialize I2C MCU Object (see board.c \NAMote72)
+
+        /////***
+        //LpmSetStopMode( LPM_APPLI_ID, LPM_ENABLE )
 
         if( GetBoardPowerSource( ) == BATTERY_POWER )
         {
@@ -253,9 +256,19 @@ uint8_t BoardGetBatteryLevel( void )
 
 static void BoardUnusedIoInit( void )
 {
-    HAL_DBGMCU_EnableDBGSleepMode( );
-    HAL_DBGMCU_EnableDBGStopMode( );
-    HAL_DBGMCU_EnableDBGStandbyMode( );
+    /////***** Set Unused Inputs to Known Values
+    // GpioInit( &, LED_1, PIN_OUTPUT, PIN_PUSH_PULL, PIN_NO_PULL, 0 );
+
+    /////***** Changed to only call Enable functions if USE_DEBUGGER defined
+    #ifdef USE_DEBUGGER
+        HAL_DBGMCU_EnableDBGSleepMode( );   
+        HAL_DBGMCU_EnableDBGStopMode( );
+        HAL_DBGMCU_EnableDBGStandbyMode( );
+    #else
+        HAL_DBGMCU_DisableDBGSleepMode( );   
+        HAL_DBGMCU_DisableDBGStopMode( );
+        HAL_DBGMCU_DisableDBGStandbyMode( );   
+    #endif
 }
 
 void SystemClockConfig( void )
@@ -419,9 +432,10 @@ void LpmExitStopMode( void )
  */
 void LpmEnterSleepMode( void)
 {
-    HAL_PWR_EnterSLEEPMode(PWR_MAINREGULATOR_ON, PWR_SLEEPENTRY_WFI);
-    // HAL_PWR_EnterSLEEPMode(PWR_LOWPOWERREGULATOR_ON, PWR_SLEEPENTRY_WFI);        /////***** Put board into LP Sleep Mode instead of Sleep Mode  (also try '_WFE' for wake on events)
-    // I2cDeInit(&I2c_2);                                                           /////***** Deinitialize I2C for sleep mode (?) 
+    // I2cDeInit(&I2c2);                                                        /////***** Deinitialize I2C for sleep mode (?)
+    
+    // HAL_PWR_EnterSLEEPMode(PWR_MAINREGULATOR_ON, PWR_SLEEPENTRY_WFI);
+    HAL_PWR_EnterSLEEPMode(PWR_LOWPOWERREGULATOR_ON, PWR_SLEEPENTRY_WFI);       /////***** Put board into LP Sleep Mode instead of Sleep Mode  (also try '_WFE' for wake on events)
 }
 
 void BoardLowPowerHandler( void )
