@@ -97,11 +97,6 @@ void SX1276IoInit( void )
     GpioInit( &SX1276.DIO3, RADIO_DIO_3, PIN_INPUT, PIN_PUSH_PULL, PIN_PULL_UP, 0 );
     GpioInit( &SX1276.DIO4, RADIO_DIO_4, PIN_INPUT, PIN_PUSH_PULL, PIN_PULL_UP, 0 );
     GpioInit( &SX1276.DIO5, RADIO_DIO_5, PIN_INPUT, PIN_PUSH_PULL, PIN_PULL_UP, 0 );
-
-#if defined( USE_RADIO_DEBUG )
-    GpioInit( &DbgPinTx, RADIO_DBG_PIN_TX, PIN_OUTPUT, PIN_PUSH_PULL, PIN_NO_PULL, 0 );
-    GpioInit( &DbgPinRx, RADIO_DBG_PIN_RX, PIN_OUTPUT, PIN_PUSH_PULL, PIN_NO_PULL, 0 );
-#endif
 }
 
 void SX1276IoIrqInit( DioIrqHandler **irqHandlers )
@@ -126,12 +121,20 @@ void SX1276IoDeInit( void )
     GpioInit( &SX1276.DIO5, RADIO_DIO_5, PIN_INPUT, PIN_PUSH_PULL, PIN_NO_PULL, 0 );
 }
 
-/*!
- * \brief Enables/disables the TCXO if available on board design.
- *
- * \param [IN] state TCXO enabled when true and disabled when false.
- */
-static void SX1276SetBoardTcxo( uint8_t state )
+void SX1276IoDbgInit( void )
+{
+#if defined( USE_RADIO_DEBUG )
+    GpioInit( &DbgPinTx, RADIO_DBG_PIN_TX, PIN_OUTPUT, PIN_PUSH_PULL, PIN_NO_PULL, 0 );
+    GpioInit( &DbgPinRx, RADIO_DBG_PIN_RX, PIN_OUTPUT, PIN_PUSH_PULL, PIN_NO_PULL, 0 );
+#endif
+}
+
+void SX1276IoTcxoInit( void )
+{
+    // No TCXO component available on this board design.
+}
+
+void SX1276SetBoardTcxo( uint8_t state )
 {
     // No TCXO component available on this board design.
 #if 0
@@ -258,12 +261,10 @@ void SX1276SetAntSwLowPower( bool status )
 
         if( status == false )
         {
-            SX1276SetBoardTcxo( true );
             SX1276AntSwInit( );
         }
         else
         {
-            SX1276SetBoardTcxo( false );
             SX1276AntSwDeInit( );
         }
     }

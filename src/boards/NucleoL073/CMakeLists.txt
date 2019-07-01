@@ -26,6 +26,7 @@ enable_language(ASM)
 #    "${CMAKE_CURRENT_SOURCE_DIR}/i2c-board.c"
 
 list(APPEND ${PROJECT_NAME}_SOURCES
+    "${CMAKE_CURRENT_SOURCE_DIR}/adc-board.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/board.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/delay-board.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/eeprom-board.c"

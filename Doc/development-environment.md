@@ -19,6 +19,7 @@ It allows to build the project either by using a command line terminal or by usi
 * GNU ARM-Toolchain
   * GNU/Linux:
     * Ubuntu 16.04/ Linux Mint 18: Since the official repository version is too old, one can use e.g. [PPA](https://launchpad.net/~team-gcc-arm-embedded/+archive/ubuntu/ppa)
+    * Ubuntu 18.04: the toolchain has been updated but there is a bug with [`libnewlib`](https://github.com/bbcmicrobit/micropython/issues/514#issuecomment-404759614) causing the linker to fail. `sudo apt install gcc-arm-none-eabi`
     * Linux Arch: `pacman -S arm-none-eabi-gcc arm-none-eabi-newlib`
   * Windows:
     * [GNU Arm Embedded Toolchain](https://developer.arm.com/open-source/gnu-toolchain/gnu-rm)
@@ -68,7 +69,7 @@ For Windows platforms the prefix has to be provided anyway and additionally the 
 The possibility to choose the application, target board and more options can be done using the provided configuration options.
 
 These configuration options can be set through additional commandline parameters, for example:  
-    `cmake -DCMAKE_TOOLCHAIN_FILE="cmake/toolchain-arm-none-eabi.cmake" -DAPPLICATION="LoRaMac" -DCLASS="classC" ..`
+    `cmake -DCMAKE_TOOLCHAIN_FILE="cmake/toolchain-arm-none-eabi.cmake" -DAPPLICATION="LoRaMac" -DSUB_PROJECT="classC" ..`
 
 Alternatively one can use a graphical interface to configure CMake, drop down menus and check boxes will provide to the user the possible options.
 
@@ -83,12 +84,14 @@ Alternatively one can use a graphical interface to configure CMake, drop down me
      * ping-pong
      * rx-sensi
      * tx-cw
-* `CLASS` - Class specific application example choice.  
+* `SUB_PROJECT` - LoRaMac sub project example choice.  
    **Note**: Only applicable to LoRaMac `APPLICATION` choice.  
    The possible choices are:  
      * classA
      * classB
      * classC
+     * periodic-uplink-lpp
+     * fuota-test-01
 * `ACTIVE_REGION` - Active region for which the stack will be initialized.  
    **Note**: Only applicable to LoRaMac `APPLICATION` choice.  
    The possible choices are:

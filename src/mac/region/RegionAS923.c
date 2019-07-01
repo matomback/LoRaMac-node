@@ -418,6 +418,10 @@ void RegionAS923InitDefaults( InitDefaultsParams_t* params )
         {
             // Restore channels default mask
             NvmCtx.ChannelsMask[0] |= NvmCtx.ChannelsDefaultMask[0];
+
+            // Channels
+            NvmCtx.Channels[0] = ( ChannelParams_t ) AS923_LC1;
+            NvmCtx.Channels[1] = ( ChannelParams_t ) AS923_LC2;
             break;
         }
         default:
@@ -437,6 +441,10 @@ bool RegionAS923Verify( VerifyParams_t* verify, PhyAttribute_t phyAttribute )
 {
     switch( phyAttribute )
     {
+        case PHY_FREQUENCY:
+        {
+            return VerifyRfFreq( verify->Frequency );
+        }
         case PHY_TX_DR:
         {
             if( verify->DatarateParams.UplinkDwellTime == 0 )

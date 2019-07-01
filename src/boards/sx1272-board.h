@@ -73,6 +73,16 @@ void SX1272IoIrqInit( DioIrqHandler **irqHandlers );
 void SX1272IoDeInit( void );
 
 /*!
+ * \brief Initializes the TCXO power pin.
+ */
+void SX1272IoTcxoInit( void );
+
+/*!
+ * \brief Initializes the radio debug pins.
+ */
+void SX1272IoDbgInit( void );
+
+/*!
  * \brief Resets the radio
  */
 void SX1272Reset( void );
@@ -119,6 +129,13 @@ void SX1272SetAntSw( uint8_t opMode );
  * \retval isSupported [true: supported, false: unsupported]
  */
 bool SX1272CheckRfFrequency( uint32_t frequency );
+
+/*!
+ * \brief Enables/disables the TCXO if available on board design.
+ *
+ * \param [IN] state TCXO enabled when true and disabled when false.
+ */
+void SX1272SetBoardTcxo( uint8_t state );
 
 /*!
  * \brief Gets the Defines the time required for the TCXO to wakeup [ms].

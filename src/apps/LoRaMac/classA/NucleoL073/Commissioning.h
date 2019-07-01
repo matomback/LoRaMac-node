@@ -31,25 +31,25 @@
   versions of the specification.
   Thus it has been decided to use the 1.1.x keys and EUI name definitions.
   The below table shows the names equivalence between versions:
-               +-------------------+-------------------------+
-               |       1.0.x       |          1.1.x          |
-               +===================+=========================+
-               | LORAWAN_DEVICE_EUI| LORAWAN_DEVICE_EUI      |
-               +-------------------+-------------------------+
-               | LORAWAN_APP_EUI   | LORAWAN_JOIN_EUI        |
-               +-------------------+-------------------------+
-               | N/A               | LORAWAN_APP_KEY         |
-               +-------------------+-------------------------+
-               | LORAWAN_APP_KEY   | LORAWAN_NWK_KEY         |
-               +-------------------+-------------------------+
-               | LORAWAN_NWK_S_KEY | LORAWAN_F_NWK_S_INT_KEY |
-               +-------------------+-------------------------+
-               | LORAWAN_NWK_S_KEY | LORAWAN_S_NWK_S_INT_KEY |
-               +-------------------+-------------------------+
-               | LORAWAN_NWK_S_KEY | LORAWAN_NWK_S_ENC_KEY   |
-               +-------------------+-------------------------+
-               | LORAWAN_APP_S_KEY | LORAWAN_APP_S_KEY       |
-               +-------------------+-------------------------+
+               +---------------------+-------------------------+
+               |       1.0.x         |          1.1.x          |
+               +=====================+=========================+
+               | LORAWAN_DEVICE_EUI  | LORAWAN_DEVICE_EUI      |
+               +---------------------+-------------------------+
+               | LORAWAN_APP_EUI     | LORAWAN_JOIN_EUI        |
+               +---------------------+-------------------------+
+               | LORAWAN_GEN_APP_KEY | LORAWAN_APP_KEY         |
+               +---------------------+-------------------------+
+               | LORAWAN_APP_KEY     | LORAWAN_NWK_KEY         |
+               +---------------------+-------------------------+
+               | LORAWAN_NWK_S_KEY   | LORAWAN_F_NWK_S_INT_KEY |
+               +---------------------+-------------------------+
+               | LORAWAN_NWK_S_KEY   | LORAWAN_S_NWK_S_INT_KEY |
+               +---------------------+-------------------------+
+               | LORAWAN_NWK_S_KEY   | LORAWAN_NWK_S_ENC_KEY   |
+               +---------------------+-------------------------+
+               | LORAWAN_APP_S_KEY   | LORAWAN_APP_S_KEY       |
+               +---------------------+-------------------------+
  ******************************************************************************
  ******************************************************************************
  ******************************************************************************
@@ -105,6 +105,12 @@
  */
 ///// Set Value
 #define LORAWAN_APP_KEY                                    { 0xDC, 0x9F, 0xC9, 0x10, 0x6C, 0xE2, 0x95, 0x43, 0x26, 0x74, 0xA2, 0x8B, 0x47, 0x29, 0x3B, 0x57 }
+
+/*!
+ * Application root key - Used to derive Multicast keys on 1.0.x devices.
+ * WARNING: USED only FOR 1.0.x DEVICES
+ */
+#define LORAWAN_GEN_APP_KEY                                { 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F }
 
 /*!
  * Network root key

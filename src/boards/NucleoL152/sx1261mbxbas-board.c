@@ -48,11 +48,6 @@ void SX126xIoInit( void )
     GpioInit( &SX126x.BUSY, RADIO_BUSY, PIN_INPUT, PIN_PUSH_PULL, PIN_NO_PULL, 0 );
     GpioInit( &SX126x.DIO1, RADIO_DIO_1, PIN_INPUT, PIN_PUSH_PULL, PIN_NO_PULL, 0 );
     GpioInit( &DeviceSel, RADIO_DEVICE_SEL, PIN_INPUT, PIN_PUSH_PULL, PIN_NO_PULL, 0 );
-
-#if defined( USE_RADIO_DEBUG )
-    GpioInit( &DbgPinTx, RADIO_DBG_PIN_TX, PIN_OUTPUT, PIN_PUSH_PULL, PIN_NO_PULL, 0 );
-    GpioInit( &DbgPinRx, RADIO_DBG_PIN_RX, PIN_OUTPUT, PIN_PUSH_PULL, PIN_NO_PULL, 0 );
-#endif
 }
 
 void SX126xIoIrqInit( DioIrqHandler dioIrq )
@@ -65,6 +60,19 @@ void SX126xIoDeInit( void )
     GpioInit( &SX126x.Spi.Nss, RADIO_NSS, PIN_ANALOGIC, PIN_PUSH_PULL, PIN_PULL_UP, 1 );
     GpioInit( &SX126x.BUSY, RADIO_BUSY, PIN_ANALOGIC, PIN_PUSH_PULL, PIN_NO_PULL, 0 );
     GpioInit( &SX126x.DIO1, RADIO_DIO_1, PIN_ANALOGIC, PIN_PUSH_PULL, PIN_NO_PULL, 0 );
+}
+
+void SX126xIoDbgInit( void )
+{
+#if defined( USE_RADIO_DEBUG )
+    GpioInit( &DbgPinTx, RADIO_DBG_PIN_TX, PIN_OUTPUT, PIN_PUSH_PULL, PIN_NO_PULL, 0 );
+    GpioInit( &DbgPinRx, RADIO_DBG_PIN_RX, PIN_OUTPUT, PIN_PUSH_PULL, PIN_NO_PULL, 0 );
+#endif
+}
+
+void SX126xIoTcxoInit( void )
+{
+    // No TCXO component available on this board design.
 }
 
 uint32_t SX126xGetBoardTcxoWakeupTime( void )
@@ -124,14 +132,16 @@ void SX126xWriteCommand( RadioCommands_t command, uint8_t *buffer, uint16_t size
     }
 }
 
-void SX126xReadCommand( RadioCommands_t command, uint8_t *buffer, uint16_t size )
+uint8_t SX126xReadCommand( RadioCommands_t command, uint8_t *buffer, uint16_t size )
 {
+    uint8_t status = 0;
+
     SX126xCheckDeviceReady( );
 
     GpioWrite( &SX126x.Spi.Nss, 0 );
 
     SpiInOut( &SX126x.Spi, ( uint8_t )command );
-    SpiInOut( &SX126x.Spi, 0x00 );
+    status = SpiInOut( &SX126x.Spi, 0x00 );
     for( uint16_t i = 0; i < size; i++ )
     {
         buffer[i] = SpiInOut( &SX126x.Spi, 0 );
@@ -140,6 +150,8 @@ void SX126xReadCommand( RadioCommands_t command, uint8_t *buffer, uint16_t size 
     GpioWrite( &SX126x.Spi.Nss, 1 );
 
     SX126xWaitOnBusy( );
+
+    return status;
 }
 
 void SX126xWriteRegisters( uint16_t address, uint8_t *buffer, uint16_t size )

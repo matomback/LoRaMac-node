@@ -260,6 +260,11 @@ bool SX1272IsChannelFree( RadioModems_t modem, uint32_t freq, int16_t rssiThresh
     int16_t rssi = 0;
     uint32_t carrierSenseTime = 0;
 
+    if( SX1272GetStatus( ) != RF_IDLE )
+    {
+        return false;
+    }
+
     SX1272SetModem( modem );
 
     SX1272SetChannel( freq );
@@ -747,6 +752,10 @@ void SX1272SetSleep( void )
     TimerStop( &TxTimeoutTimer );
 
     SX1272SetOpMode( RF_OPMODE_SLEEP );
+
+    // Disable TCXO radio is in SLEEP mode
+    SX1272SetBoardTcxo( false );
+
     SX1272.Settings.State = RF_IDLE;
 }
 
@@ -762,6 +771,7 @@ void SX1272SetStby( void )
 void SX1272SetRx( uint32_t timeout )
 {
     bool rxContinuous = false;
+    TimerStop( &TxTimeoutTimer );
 
     switch( SX1272.Settings.Modem )
     {
@@ -859,11 +869,8 @@ void SX1272SetRx( uint32_t timeout )
     {
         SX1272SetOpMode( RF_OPMODE_RECEIVER );
 
-        if( rxContinuous == false )
-        {
-            TimerSetValue( &RxTimeoutSyncWord, SX1272.Settings.Fsk.RxSingleTimeout );
-            TimerStart( &RxTimeoutSyncWord );
-        }
+        TimerSetValue( &RxTimeoutSyncWord, SX1272.Settings.Fsk.RxSingleTimeout );
+        TimerStart( &RxTimeoutSyncWord );
     }
     else
     {
@@ -880,6 +887,8 @@ void SX1272SetRx( uint32_t timeout )
 
 void SX1272SetTx( uint32_t timeout )
 {
+    TimerStop( &RxTimeoutTimer );
+
     TimerSetValue( &TxTimeoutTimer, timeout );
 
     switch( SX1272.Settings.Modem )
@@ -1039,6 +1048,8 @@ void SX1272SetOpMode( uint8_t opMode )
     }
     else
     {
+        // Enable TCXO if operating mode different from SLEEP.
+        SX1272SetBoardTcxo( true );
         SX1272SetAntSwLowPower( false );
         SX1272SetAntSw( opMode );
     }
@@ -1066,14 +1077,14 @@ void SX1272SetModem( RadioModems_t modem )
     {
     default:
     case MODEM_FSK:
-        SX1272SetSleep( );
+        SX1272SetOpMode( RF_OPMODE_SLEEP );
         SX1272Write( REG_OPMODE, ( SX1272Read( REG_OPMODE ) & RFLR_OPMODE_LONGRANGEMODE_MASK ) | RFLR_OPMODE_LONGRANGEMODE_OFF );
 
         SX1272Write( REG_DIOMAPPING1, 0x00 );
         SX1272Write( REG_DIOMAPPING2, 0x30 ); // DIO5=ModeReady
         break;
     case MODEM_LORA:
-        SX1272SetSleep( );
+        SX1272SetOpMode( RF_OPMODE_SLEEP );
         SX1272Write( REG_OPMODE, ( SX1272Read( REG_OPMODE ) & RFLR_OPMODE_LONGRANGEMODE_MASK ) | RFLR_OPMODE_LONGRANGEMODE_ON );
 
         SX1272Write( REG_DIOMAPPING1, 0x00 );
@@ -1432,6 +1443,9 @@ void SX1272OnDio1Irq( void* context )
             switch( SX1272.Settings.Modem )
             {
             case MODEM_FSK:
+                // Stop timer
+                TimerStop( &RxTimeoutSyncWord );
+
                 // FifoLevel interrupt
                 // Read received packet size
                 if( ( SX1272.Settings.FskPacketHandler.Size == 0 ) && ( SX1272.Settings.FskPacketHandler.NbBytes == 0 ) )

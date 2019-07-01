@@ -192,6 +192,16 @@ void BoardInitMcu( void )
     if( McuInitialized == false )
     {
         McuInitialized = true;
+#if defined( SX1261MBXBAS ) || defined( SX1262MBXCAS ) || defined( SX1262MBXDAS )
+        SX126xIoDbgInit( );
+        // WARNING: If necessary the TCXO control is initialized by SX126xInit function.
+#elif defined( SX1272MB2DAS)
+        SX1272IoDbgInit( );
+        SX1272IoTcxoInit( );
+#elif defined( SX1276MB1LAS ) || defined( SX1276MB1MAS )
+        SX1276IoDbgInit( );
+        SX1276IoTcxoInit( );
+#endif
         if( GetBoardPowerSource( ) == BATTERY_POWER )
         {
             CalibrateSystemWakeupTime( );
@@ -205,7 +215,6 @@ void BoardResetMcu( void )
 
     //Restart system
     NVIC_SystemReset( );
-
 }
 
 void BoardDeInitMcu( void )
