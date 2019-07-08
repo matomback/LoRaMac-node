@@ -35,10 +35,12 @@
 
         // Select LoRaMac sub project. You can choose between:
         // classA, classB or classC, periodic-uplink-lpp, fuota-test-01.
-        "SUB_PROJECT":"periodic-uplink-lpp",
+        "SUB_PROJECT":"classA",
+        //"SUB_PROJECT":"periodic-uplink-lpp",
 
         // Switch for Class B support of LoRaMac:
-        "CLASSB_ENABLED":"ON",
+        "CLASSB_ENABLED":"OFF",
+        //"CLASSB_ENABLED":"ON",
 
         // Select the active region for which the stack will be initialized.
         // You can choose between:
