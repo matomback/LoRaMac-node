@@ -1225,8 +1225,8 @@ int main( void )
     LoRaMacCallback_t macCallbacks;
     MibRequestConfirm_t mibReq;
     LoRaMacStatus_t status;
-    uint8_t devEui[] = LORAWAN_DEVICE_EUI;
-    uint8_t joinEui[] = LORAWAN_JOIN_EUI;
+    uint8_t DevEui[] = LORAWAN_DEVICE_EUI;          //***** Changed 'devEui' to 'DevEui'
+    uint8_t JoinEui[] = LORAWAN_JOIN_EUI;           //***** Changed 'joinEui' to 'JoinEui'
 
     BoardInitMcu( );
     BoardInitPeriph( );
@@ -1308,11 +1308,11 @@ int main( void )
                     }
 
                     mibReq.Type = MIB_DEV_EUI;
-                    mibReq.Param.DevEui = devEui;
+                    mibReq.Param.DevEui = DevEui;                   //***** Changed 'devEui' to 'DevEui'
                     LoRaMacMibSetRequestConfirm( &mibReq );
 
                     mibReq.Type = MIB_JOIN_EUI;
-                    mibReq.Param.JoinEui = joinEui;
+                    mibReq.Param.JoinEui = JoinEui;                 //***** Changed to 'joinEui' to 'JoinEui'
                     LoRaMacMibSetRequestConfirm( &mibReq );
 
 #if( OVER_THE_AIR_ACTIVATION == 0 )
