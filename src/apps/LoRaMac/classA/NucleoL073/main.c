@@ -31,11 +31,11 @@
 #include "Commissioning.h"
 #include "NvmCtxMgmt.h"
 
-/////***** Includes added for SHT21 Implementation, Testing Mode, etc..
-#include "delay.h"
-#include "sht21.h"           
+//*** Includes added for SHT21 Implementation, Cayenne LPP Format, Testing Mode, etc..
 #include "board-config.h"
-
+#include "sht21.h"           
+#include "CayenneLpp.h"
+#include "delay.h"
 
 
 #ifndef ACTIVE_REGION
@@ -51,7 +51,7 @@
  * Defines the application data transmission duty cycle. 5s, value in [ms].
  */
 #define APP_TX_DUTYCYCLE                            5000
-static uint16_t custom_tx_dutycycle = 5000;                     /////***** use instead of APP_TX_DUTYCYCLE to change dutycycle mid-app (after Join)
+static uint16_t custom_tx_dutycycle = 5000;                 //* Use instead of APP_TX_DUTYCYCLE to change dutycycle mid-app (after Join)
 
 /*!
  * Defines a random delay for application data transmission duty cycle. 1s,
@@ -74,8 +74,7 @@ static uint16_t custom_tx_dutycycle = 5000;                     /////***** use i
  *
  * \remark Please note that when ADR is enabled the end-device should be static
  */
-///// Set ADR to OFF (Default ON)
-#define LORAWAN_ADR_ON                              0
+#define LORAWAN_ADR_ON                              0       //* Set ADR to OFF (Default ON)
 
 
 
@@ -125,10 +124,6 @@ static uint32_t DevAddr = LORAWAN_DEVICE_ADDRESS;
  * Application port
  */
 static uint8_t AppPort = LORAWAN_APP_PORT;
-
-
-
-///// Payload data and size (?)
 
 /*!
  * User application data size
@@ -228,8 +223,6 @@ typedef enum
 }LoRaMacHandlerMsgTypes_t;
 
 
-uint8_t Message1[] = "Hello LoRa!";                 /////*****
-
 /*!
  * Application data structure
  */
@@ -244,8 +237,8 @@ typedef struct LoRaMacHandlerAppData_s
 LoRaMacHandlerAppData_t AppData =
 {
     .MsgType = LORAMAC_HANDLER_UNCONFIRMED_MSG,
-    .Buffer = NULL,                                  /////***** Default: 'NULL'
-    .BufferSize = 0,                                 /////***** Default: '0'
+    .Buffer = NULL,
+    .BufferSize = 0,
     .Port = 0
 };
 
@@ -351,8 +344,8 @@ static void JoinNetwork( void )
     // Starts the join procedure
     status = LoRaMacMlmeRequest( &mlmeReq );
     printf( "\r\n###### ===== MLME-Request - MLME_JOIN ==== ######\r\n" );
-    printf( "\tSTATUS      : %s\r\n", MacStatusStrings[status] );               /////***** Debug added
-    printf( "\tJOIN DR     : %d\r\n", mlmeReq.Req.Join.Datarate);               /////***** Debug added 
+    printf( "\tSTATUS      : %s\r\n", MacStatusStrings[status] );               //* Debug added
+    printf( "\tJOIN DR     : %d\r\n", mlmeReq.Req.Join.Datarate);               //* Debug added 
 
     if( status == LORAMAC_STATUS_OK )
     {
@@ -367,20 +360,24 @@ static void JoinNetwork( void )
 
 
 
-/////*****
+//***
 //*******************************************************
 //  SENSOR CODE (Read) 
 //  parts from Sensirion SHT21 Sample Code (SHT2x.h)
 //  and SHT21 MBED examples
 //*******************************************************
 
+// Cayenne LPP Application Port
+#define CAYENNE_LPP_PORT                            3       // App Port for sending Cayenne LPP encoded payload (see https://mydevices.com/cayenne/docs/lora/#lora-cayenne-low-power-payload)
+
+// Sensor Activation (Enabled/Disabled)
+static bool MoistureOn = true;
+static bool TemperatureOn = true;
+static bool HumidityOn = true;
+
 // Sensor Readings in Float Format
 float temperatureC;
 float humidityRH;
-
-// Sensor Readings in Integer Format for Cayenne LPP Encoding
-signed temperatureC_int;
-unsigned humidityRH_int;
 
 // Union for reading sensor bytes as both float and unsigned 
 union ufloat {
@@ -393,10 +390,10 @@ Gpio_t Int_moisture;
 Gpio_t Int_short;
 
 // Moisture Detection
-static uint8_t moisture_value = 0;
-static bool moistureIrqFired = false;           // Tracks if moisture interrupt has been fired, sent as a byte over Lora packet
-static TimerEvent_t MoistureTimer;              // Timer instance for moisture refractory period (moistureIrqFired resets)
-static uint16_t moisture_refractory = 5000;
+static uint8_t moisture_value = 0;                          // Moisture interrupt pin level
+static bool moistureIrqFired = false;                       // Tracks if moisture interrupt has been fired, sent as a byte over Lora packet
+static TimerEvent_t MoistureTimer;                          // Timer instance for moisture refractory period (moistureIrqFired resets)
+static uint16_t moisture_refractory = 5000;                 // Period for which a subsequent moisture alert cannot be triggered
 
 // Timeout Handler for Lora Moisture Timer Timeout
 static void OnMoistureTimerEvent( void* context )
@@ -407,43 +404,33 @@ static void OnMoistureTimerEvent( void* context )
 // Function for Reading SHT sensor and Moisture sensor
 static void ReadSHT(void) 
 {
+    uint8_t error = 0;
+
     uint16_t result_TC;
     uint16_t result_RH;
 
-    uint8_t error = 0;
-
-    error |= SHT2x_Measure(TEMP, &result_TC);
-    temperatureC = SHT2x_CalcTemperatureC(result_TC);
-    temperatureC_int = (signed)(temperatureC*10);           // Converts calculated sensor value (float) to signed int, encoded for Cayenne LPP Temperature format
+    error |= SHT2x_Measure(TEMP, &result_TC);               // Gets TEMP sensor signal output and stores in result_TC
+    temperatureC = SHT2x_CalcTemperatureC(result_TC);       // Calculates temp value (float) from signal output
 
     //DelayMs(5);
 
-    error |= SHT2x_Measure(HUMIDITY, &result_RH);
-    humidityRH = SHT2x_CalcRH(result_RH); 
-    humidityRH_int = (unsigned)(humidityRH*2);              // Converts calculated sensor value (float) to unsigned int, encoded for Cayenne LPP Humidity format
+    error |= SHT2x_Measure(HUMIDITY, &result_RH);           // Gets HUMIDITY sensor signal output and stores in result_RH
+    humidityRH = SHT2x_CalcRH(result_RH);                   // Calculates humidity value (float) from signal output
 
-    // Polling Moisture Sensor
-    #ifndef LORA_INTERRUPT
-        
-        //***** Polling - Pin Alone - Int_moisture pin pulled high (sense if low) -- only when in contact, not through water
-        // GpioWrite( &Int_moisture, 1);
-        // DelayMs(50);
+    // Moisture Sensor - Polling Method
+    #ifndef MOISTURE_INTERRUPT
 
-        //***** Polling - Pin Alone - Int_moisture pin pulled low (sense if high) -- works through water as well as contact, can 'reset' pin reliably
-        // GpioWrite( &Int_moisture, 0);
-        // DelayMs(50);
+    moisture_value = GpioRead( &Int_moisture );
 
-        moisture_value = GpioRead( &Int_moisture );
+    if (moisture_value == 1)
+    {
+        printf("MOISTURE DETECTED!!!\r\n");             // Debug - prints moisture alert to console
+        moistureIrqFired = true;                        // Set MoistureIrqFired Status to True
+        TimerStart( &MoistureTimer );                   // Set timer to reset moistureIrqFired Status
 
-        if (moisture_value == 1)
-        {
-            printf("MOISTURE DETECTED!!!\r\n");
-            moistureIrqFired = true;            // Set MoistureIrqFired Status to True
-            TimerStart( &MoistureTimer );       // Set timer to reset moistureIrqFired Status
-
-            // NextTx = true;
-            // DeviceState = DEVICE_STATE_SEND;
-        }
+        // NextTx = true;
+        // DeviceState = DEVICE_STATE_SEND;
+    }
 
     #endif
 
@@ -451,39 +438,41 @@ static void ReadSHT(void)
 
 
 
-/////*****
+//***
 //*******************************************************
-//  Lora Interrupt Initialization and Functions 
+//  Moisture Interrupt Initialization and Handler 
 //  
 //*******************************************************
 
-typedef void ( LoraIrqHandler )( void* context );
+#ifdef MOISTURE_INTERRUPT
 
-/////***** Lora Interrupt Initialization
-void LoraIrqInit ( LoraIrqHandler hIrq )
+typedef void ( MoistureIrqHandler )( void* context );
+
+void MoistureIrqInit ( MoistureIrqHandler hIrq )
 {
-    // Int_moisture pin pulled high (sense rising/falling) -- only when in contact, not through water
     // Int_moisture pin pulled low (sense rising/falling) -- works through water as well as contact, a bit difficult to 'reset' pin reliably
     GpioInit( &Int_moisture, INT_M, PIN_INPUT, PIN_PUSH_PULL, PIN_PULL_DOWN, 0 );               // Initializes INT_M pin as input pulled low
     GpioInit( &Int_short, INT_S, PIN_OUTPUT, PIN_PUSH_PULL, PIN_PULL_UP, 1 );                   // Initializes INT_S pin as output high
+    
+    // Int_moisture pin pulled high (sense rising/falling) -- only when in contact, not through water
     // GpioInit( &Int_moisture, INT_M, PIN_INPUT, PIN_PUSH_PULL, PIN_PULL_UP, 1 );                 // Initializes INT_M pin as input pulled up
     // GpioInit( &Int_short, INT_S, PIN_OUTPUT, PIN_PUSH_PULL, PIN_PULL_DOWN, 0 );                 // Initializes INT_S pin as output low
+
     GpioSetInterrupt( &Int_moisture, IRQ_RISING_FALLING_EDGE, IRQ_HIGH_PRIORITY, hIrq );        // Sets interrupt (type, priority, handler)
 }
 
-/////***** Interrupt Handler for Lora Moisture Interrupt
-void moistureHandler(void* context)
+void MoistureHandler(void* context)
 {
     if (moistureIrqFired == false)
     {
-        printf("MOISTURE DETECTED!!!\r\n");
+        printf("MOISTURE DETECTED!!!\r\n");                 // Debug - prints moisture alert to console
 
-        GpioWrite( &Int_moisture, 0);       // Make sure Moisture Pin set low again
-        moistureIrqFired = true;            // Set moistureIrqFired Status to True
-        TimerStart( &MoistureTimer );       // Set timer to reset moistureIrqFired Status
+        GpioWrite( &Int_moisture, 0);                       // Make sure Moisture Pin set low again
+        moistureIrqFired = true;                            // Set moistureIrqFired Status to True
+        TimerStart( &MoistureTimer );                       // Set timer to reset moistureIrqFired Status
 
-        NextTx = true;                      // Prepare next Tx to send uplink with Moisture Alert
-        DeviceState = DEVICE_STATE_SEND;    // Set Device State to send uplink with Moisture Alert
+        NextTx = true;                                      // Prepare next Tx to send uplink with Moisture Alert
+        DeviceState = DEVICE_STATE_SEND;                    // Set Device State to send uplink with Moisture Alert
     }
     else
     {
@@ -491,52 +480,7 @@ void moistureHandler(void* context)
     }
 }
 
-
-
-
-/////*****
-//*******************************************************
-//  Cayenne LPP - Payload Encoding
-//  
-//*******************************************************
-
-// Cayenne LPP Application Port
-#define CAYENNE_LPP_PORT                            3
-
-// Sensor Status (Enabled/Disabled)
-static bool MoistureOn = true;
-static bool TemperatureOn = true;
-static bool HumidityOn = true;
-
-// Constants For Data Types
-#define LPP_DIGITAL_INPUT       0       // 1 byte
-#define LPP_DIGITAL_OUTPUT      1       // 1 byte
-#define LPP_ANALOG_INPUT        2       // 2 bytes, 0.01 signed
-#define LPP_ANALOG_OUTPUT       3       // 2 bytes, 0.01 signed
-#define LPP_LUMINOSITY          101     // 2 bytes, 1 lux unsigned
-#define LPP_PRESENCE            102     // 1 byte, 1
-#define LPP_TEMPERATURE         103     // 2 bytes, 0.1°C signed
-#define LPP_RELATIVE_HUMIDITY   104     // 1 byte, 0.5% unsigned
-#define LPP_ACCELEROMETER       113     // 2 bytes per axis, 0.001G
-#define LPP_BAROMETRIC_PRESSURE 115     // 2 bytes 0.1 hPa Unsigned
-#define LPP_GYROMETER           134     // 2 bytes per axis, 0.01 °/s
-#define LPP_GPS                 136     // 3 byte lon/lat 0.0001 °, 3 bytes alt 0.01m  (9 bytes total)
-
-// Constants for Sensor Byte Size   (Byte Size = Data ID (1) + Data Type (1) + Data Size)
-#define LPP_DIGITAL_INPUT_SIZE       3
-#define LPP_DIGITAL_OUTPUT_SIZE      3
-#define LPP_ANALOG_INPUT_SIZE        4
-#define LPP_ANALOG_OUTPUT_SIZE       4
-#define LPP_LUMINOSITY_SIZE          4
-#define LPP_PRESENCE_SIZE            3
-#define LPP_TEMPERATURE_SIZE         4
-#define LPP_RELATIVE_HUMIDITY_SIZE   3
-#define LPP_ACCELEROMETER_SIZE       8
-#define LPP_BAROMETRIC_PRESSURE_SIZE 4
-#define LPP_GYROMETER_SIZE           8
-#define LPP_GPS_SIZE                 11
-
-
+#endif
 
 
 
@@ -559,16 +503,7 @@ static void PrepareTxFrame( uint8_t port )
             // AppDataSizeBackup = AppDataSize = 1;
             // AppDataBuffer[0] = AppLedStateOn;
 
-            // Encodes packet that reads "TEMP: "
-            // AppDataSize = 6;
-            // AppDataBuffer[0] = (uint8_t)84;
-            // AppDataBuffer[1] = (uint8_t)101;
-            // AppDataBuffer[2] = (uint8_t)109;
-            // AppDataBuffer[3] = (uint8_t)112;
-            // AppDataBuffer[4] = (uint8_t)58;
-            // AppDataBuffer[5] = (uint8_t)32;
-
-            // Encodes packet with temp and humidity (MSB first), and moisture interrupt
+            //* Encodes packet with temp and humidity (MSB first), and moisture interrupt
             AppDataSize = 9;
             AppDataBuffer[0] = (utemp.u >> 24) &0xFF;
             AppDataBuffer[1] = (utemp.u >> 16) &0xFF;
@@ -581,50 +516,20 @@ static void PrepareTxFrame( uint8_t port )
             AppDataBuffer[8] = moistureIrqFired;
         }
         break;
-    /////***** Cayenne encoding
-    // (see https://mydevices.com/cayenne/docs/lora/#lora-cayenne-low-power-payload)
+    //*** Cayenne encoding
     case 3: 
         {
+            uint8_t cursor = 0;
 
-            // Set AppDataSize (case 3 application - Cayenne encoding)
-            AppDataSize = 0;
+            CayenneLppInit();
 
-            uint8_t b = 0;
+            if (HumidityOn == true) { cursor = CayenneLppAddRelativeHumidity(1, humidityRH); }
+            if (TemperatureOn == true) { cursor = CayenneLppAddTemperature(1, temperatureC); }
+            if (MoistureOn == true) { cursor = CayenneLppAddDigitalOutput(1, moistureIrqFired); }
 
-            if( MoistureOn == true )
-            {
-                AppDataSize += LPP_DIGITAL_INPUT_SIZE;
-                AppDataBuffer[b++] = 1;                         // Channel ()
-                AppDataBuffer[b++] = LPP_DIGITAL_INPUT;         // Type: Digital Input -- 1 byte, 1 bit resolution
-                AppDataBuffer[b++] = moistureIrqFired;
-            }
-            if( HumidityOn == true )
-            {
-                AppDataSize += LPP_RELATIVE_HUMIDITY_SIZE;
-                AppDataBuffer[b++] = 2;                         // Channel ()
-                AppDataBuffer[b++] = LPP_RELATIVE_HUMIDITY;     // Type: Humidity -- 1 byte, 0.5% unsigned
-                AppDataBuffer[b++] = humidityRH_int &0xFF;
-            }
-            if( TemperatureOn == true )
-            {
-                AppDataSize += LPP_TEMPERATURE_SIZE;
-                AppDataBuffer[b++] = 3;                         // Channel ()
-                AppDataBuffer[b++] = LPP_TEMPERATURE;           // Type: Temp -- 2 bytes, 0.1C signed MSB
-                AppDataBuffer[b++] = (temperatureC_int >> 8) &0xFF;
-                AppDataBuffer[b++] = temperatureC_int &0xFF;
-            }
+            AppDataSize = CayenneLppCopy(AppDataBuffer);            // Copy buffer and buffer size from CayenneLpp file to AppDataBuffer and AppDataSize
 
-            // AppDataSize = LPP_DIGITAL_INPUT_SIZE + LPP_RELATIVE_HUMIDITY_SIZE + LPP_TEMPERATURE_SIZE;
-            // AppDataBuffer[0] = 1;                       // Channel ()
-            // AppDataBuffer[1] = LPP_DIGITAL_INPUT;       // Type: Digital Input -- 1 byte, 1 bit resolution
-            // AppDataBuffer[2] = moistureIrqFired;        
-            // AppDataBuffer[3] = 2;                       // Channel ()
-            // AppDataBuffer[4] = LPP_RELATIVE_HUMIDITY;   // Type: Humidity -- 1 byte, 0.5% unsigned
-            // AppDataBuffer[5] = humidityRH_int &0xFF;
-            // AppDataBuffer[6] = 3;                       // Channel ()
-            // AppDataBuffer[7] = LPP_TEMPERATURE;         // Type: Temp -- 2 bytes, 0.1C signed MSB
-            // AppDataBuffer[8] = (temperatureC_int >> 8) &0xFF;
-            // AppDataBuffer[9] = temperatureC_int &0xFF;
+            printf( "\t C-LPP Size: %d \r\n", AppDataSize);         // Debug - prints buffer size to console
         }
         break;
     case 224:
@@ -870,18 +775,20 @@ static void McpsConfirm( McpsConfirm_t *mcpsConfirm )
 
     printf( "\r\n" );
 
-    /////***** Testing Mode
+    //*** Testing Mode
     #ifdef TESTING
-        uint8_t testing_uplinks = 20;
 
-        // sends 20 uplinks and then stops (sleeps indefinitely)
-        if (mcpsConfirm->UpLinkCounter == testing_uplinks)
-        {
-                printf("\r\n ***** TESTING COMPLETE ***** \r\n");
-                TimerStop( &TxNextPacketTimer );
-                
-                DeviceState = DEVICE_STATE_SLEEP;
-        }
+    uint8_t testing_uplinks = 20;
+
+    // sends 20 uplinks and then stops (sleeps indefinitely)
+    if (mcpsConfirm->UpLinkCounter == testing_uplinks)
+    {
+        printf("\r\n ***** TESTING COMPLETE ***** \r\n");
+        TimerStop( &TxNextPacketTimer );
+        
+        DeviceState = DEVICE_STATE_SLEEP;
+    }
+
     #endif
 }
 
@@ -1124,7 +1031,7 @@ static void McpsIndication( McpsIndication_t *mcpsIndication )
 static void MlmeConfirm( MlmeConfirm_t *mlmeConfirm )
 {
     printf( "\r\n###### ===== MLME-Confirm ==== ######\r\n" );
-    printf( "\tSTATUS      : %s\r\n", EventInfoStatusStrings[mlmeConfirm->Status] );    /////***** Debug added for MlmeConfirm status
+    printf( "\tSTATUS      : %s\r\n", EventInfoStatusStrings[mlmeConfirm->Status] );    //* Debug added for MlmeConfirm status
 
     if( mlmeConfirm->Status != LORAMAC_EVENT_INFO_STATUS_OK )
     {
@@ -1152,9 +1059,7 @@ static void MlmeConfirm( MlmeConfirm_t *mlmeConfirm )
                 DeviceState = DEVICE_STATE_SEND;
 
                 #ifndef TESTING
-                {
-                    custom_tx_dutycycle = 30000;    /////***** Change to 20s dutycycle after join (only if not in TESTING mode)
-                }
+                custom_tx_dutycycle = 30000;                //* Change dutycycle after join (only if not in TESTING mode)
                 #endif
             }
             else
@@ -1225,18 +1130,22 @@ int main( void )
     LoRaMacCallback_t macCallbacks;
     MibRequestConfirm_t mibReq;
     LoRaMacStatus_t status;
-    uint8_t DevEui[] = LORAWAN_DEVICE_EUI;          //***** Changed 'devEui' to 'DevEui'
-    uint8_t JoinEui[] = LORAWAN_JOIN_EUI;           //***** Changed 'joinEui' to 'JoinEui'
+    uint8_t DevEui[] = LORAWAN_DEVICE_EUI;                  //* Changed 'devEui' to 'DevEui'
+    uint8_t JoinEui[] = LORAWAN_JOIN_EUI;                   //* Changed 'joinEui' to 'JoinEui'
 
     BoardInitMcu( );
     BoardInitPeriph( );
 
-    /////***** Setup Moisture Handler to Use Interrupt Method or Polling Method
-    #ifdef LORA_INTERRUPT
-        LoraIrqInit( moistureHandler );         ////***** Lora Moisture Interrupt initialization
+    //* Setup Moisture Handler to Use Interrupt Method or Polling Method
+    #ifdef MOISTURE_INTERRUPT
+
+    MoistureIrqInit( MoistureHandler );                     // Moisture Interrupt initialization
+
     #else
-        GpioInit( &Int_moisture, INT_M, PIN_INPUT, PIN_PUSH_PULL, PIN_PULL_DOWN, 0 );               // Initializes INT_M pin as input pulled low
-        GpioInit( &Int_short, INT_S, PIN_OUTPUT, PIN_PUSH_PULL, PIN_PULL_UP, 1 );                   // Initializes INT_S pin as output high
+
+    GpioInit( &Int_moisture, INT_M, PIN_INPUT, PIN_PUSH_PULL, PIN_PULL_DOWN, 0 );       // Initializes INT_M pin as input pulled low
+    GpioInit( &Int_short, INT_S, PIN_OUTPUT, PIN_PUSH_PULL, PIN_PULL_UP, 1 );           // Initializes INT_S pin as output high
+
     #endif
 
     macPrimitives.MacMcpsConfirm = McpsConfirm;
@@ -1276,7 +1185,7 @@ int main( void )
                 }
                 else
                 {
-                    printf( "\r\n###### ===== CTXS **NOT** RESTORED ==== ######\r\n\r\n" );     /////***** Debug added - msg for Nvm CTXS fail to restore
+                    printf( "\r\n###### ===== CTXS **NOT** RESTORED ==== ######\r\n\r\n" );     //* Debug added - msg for Nvm CTXS fail to restore
 #if( OVER_THE_AIR_ACTIVATION == 0 )
                     // Tell the MAC layer which network server version are we connecting too.
                     mibReq.Type = MIB_ABP_LORAWAN_VERSION;
@@ -1308,11 +1217,11 @@ int main( void )
                     }
 
                     mibReq.Type = MIB_DEV_EUI;
-                    mibReq.Param.DevEui = DevEui;                   //***** Changed 'devEui' to 'DevEui'
+                    mibReq.Param.DevEui = DevEui;           //* Changed 'devEui' to 'DevEui'
                     LoRaMacMibSetRequestConfirm( &mibReq );
 
                     mibReq.Type = MIB_JOIN_EUI;
-                    mibReq.Param.JoinEui = JoinEui;                 //***** Changed to 'joinEui' to 'JoinEui'
+                    mibReq.Param.JoinEui = JoinEui;         //* Changed to 'joinEui' to 'JoinEui'
                     LoRaMacMibSetRequestConfirm( &mibReq );
 
 #if( OVER_THE_AIR_ACTIVATION == 0 )
@@ -1365,8 +1274,8 @@ int main( void )
                 TimerInit( &Led2Timer, OnLed2TimerEvent );
                 TimerSetValue( &Led2Timer, 25 );
 
-                TimerInit( &MoistureTimer, OnMoistureTimerEvent );                      /////***** Initialize moisture refractory timer (reset moistureIrqStatus)
-                TimerSetValue( &MoistureTimer, moisture_refractory );                   /////***** Set moisture refractory period (reset moistureIrqSatuts)
+                TimerInit( &MoistureTimer, OnMoistureTimerEvent );              //* Initialize moisture refractory timer (reset moistureIrqStatus)
+                TimerSetValue( &MoistureTimer, moisture_refractory );           //* Set moisture refractory period (reset moistureIrqSatuts)
 
                 mibReq.Type = MIB_PUBLIC_NETWORK;
                 mibReq.Param.EnablePublicNetwork = LORAWAN_PUBLIC_NETWORK;
@@ -1453,18 +1362,18 @@ int main( void )
             {
                 if( NextTx == true )
                 {
+                    //* Read Sensors
                     ReadSHT();
-                    utemp.f = temperatureC;     // saves temp float in utemp union
-                    urh.f = humidityRH;         // saves rh float in utrh union
+                    utemp.f = temperatureC;                 // saves temp float in utemp union
+                    urh.f = humidityRH;                     // saves rh float in utrh union
 
-                    AppPort = CAYENNE_LPP_PORT; // send payload using Cayenne LPP formatting
+                    AppPort = CAYENNE_LPP_PORT;             // send payload using Cayenne LPP formatting
 
-                    /////***** SHT Debug
+                    //* SHT Debug
                     printf( "\t Temp Float: %2.2f degC \r\n", temperatureC);        // print temp float as float
                     printf( "\t Temp Float Hex: %x \r\n", temperatureC);            // print temp float as hex              - incorrect arrangement of bytes for float
                     printf( "\t Temp Unsigned HEX: %x \r\n", utemp.u);              // print temp unsigned (union) as hex   - * correct arrangement of bytes for float
                     printf( "\t Temp Float HEX: %x \r\n", utemp.f);                 // print temp float (union) as hex     
-                    printf( "\t Temp HEX Cayenne: %x \r\n", temperatureC_int);      // print temp int (cayenne format) as hex 
 
                     PrepareTxFrame( AppPort );
 
@@ -1475,7 +1384,7 @@ int main( void )
             }
             case DEVICE_STATE_CYCLE:
             {
-                ReadSHT();
+                ReadSHT();                                  // read sensors
                 DeviceState = DEVICE_STATE_SLEEP;
                 if( ComplianceTest.Running == true )
                 {
@@ -1486,7 +1395,7 @@ int main( void )
                 {
                     // Schedule next packet transmission
                     // TxDutyCycleTime = APP_TX_DUTYCYCLE + randr( -APP_TX_DUTYCYCLE_RND, APP_TX_DUTYCYCLE_RND );
-                    TxDutyCycleTime = custom_tx_dutycycle + randr( -APP_TX_DUTYCYCLE_RND, APP_TX_DUTYCYCLE_RND );       /////***** Changed to variable tx_dutycycle
+                    TxDutyCycleTime = custom_tx_dutycycle + randr( -APP_TX_DUTYCYCLE_RND, APP_TX_DUTYCYCLE_RND );       //* Changed to variable: custom_tx_dutycycle
                 }
 
                 // Schedule next packet transmission
@@ -1512,7 +1421,7 @@ int main( void )
                     // The MCU wakes up through events
                     BoardLowPowerHandler( );
 
-                    /////*** Make Restore - so handles properly after comes out of stop mode
+                    //* Make Restore - so handles properly after comes out of stop mode
                     //DeviceState = DEVICE_STATE_RESTORE;
                 }
                 CRITICAL_SECTION_END( );

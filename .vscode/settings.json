@@ -81,5 +81,8 @@
         "REGION_KR920":"OFF",
         "REGION_IN865":"OFF",
         "REGION_RU864":"OFF"
+    },
+    "files.associations": {
+        "board-config.h": "c"
     }
 }
