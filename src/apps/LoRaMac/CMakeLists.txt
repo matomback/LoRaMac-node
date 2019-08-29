@@ -104,7 +104,7 @@ else() #if(SUB_PROJECT STREQUAL classA OR SUB_PROJECT STREQUAL classB OR SUB_PRO
     #---------------------------------------------------------------------------------------
     list(APPEND ${PROJECT_NAME}_COMMON
         "${CMAKE_CURRENT_LIST_DIR}/common/NvmCtxMgmt.c"
-        "${CMAKE_CURRENT_LIST_DIR}/common/CayenneLpp.c"   #//*** manually added
+        "${CMAKE_CURRENT_LIST_DIR}/common/CayenneLpp.c"   #//*** manually added CayenneLpp.c to classA application project dir
     )
 
     #---------------------------------------------------------------------------------------
